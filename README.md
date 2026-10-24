@@ -20,6 +20,9 @@ static React build that can live on **GitHub Pages**. There is no server to run.
 | **Admin** | `/dobby` holds the request queue, the member list, admin/suspend controls and counts for the whole circle. |
 | **Design** | Light, Apple-leaning interface: system font stack, translucent bars, soft cards, quiet gradients. English copy. |
 
+Sign-in accepts a full email address, or a bare username such as `dobby_admin` — those map
+to an internal `@stfu.local` address that never receives mail.
+
 ## Stack
 
 - React 19 + TypeScript + Vite, React Router 7
