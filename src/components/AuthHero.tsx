@@ -1,6 +1,7 @@
 import { CalendarDays, Home, Images } from 'lucide-react'
 import heroPhoto from '../assets/hero-dogs.webp'
 import { LogoMark } from './Logo'
+import { MemoryCollage } from './MemoryCollage'
 
 const features = [
   { icon: Home, title: 'Timeline', detail: 'posts, photos, voice notes' },
@@ -32,18 +33,7 @@ export function AuthHero() {
       </header>
 
       <div className="flex min-h-0 flex-1 items-center justify-center px-6 py-4 sm:px-8 sm:py-5 lg:px-10 lg:py-7">
-        <figure className="hero-poster">
-          <img
-            src={heroPhoto}
-            width={1200}
-            height={800}
-            alt="A jack russell terrier in sunglasses shushing a wide-eyed golden retriever"
-          />
-          <figcaption className="hero-poster__badge">
-            <span aria-hidden>🤫</span>
-            just us
-          </figcaption>
-        </figure>
+        <MemoryCollage />
       </div>
 
       <div className="px-6 pb-6 sm:px-8 sm:pb-8 lg:px-10 lg:pb-12">
