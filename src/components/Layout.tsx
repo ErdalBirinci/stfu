@@ -142,13 +142,11 @@ export function AuthShell({
 }) {
   if (variant === 'split') {
     return (
-      <div className="min-h-dvh bg-[#fbfbfd] lg:grid lg:grid-cols-2">
-        <section className="relative flex items-center justify-center overflow-hidden px-6 pb-8 pt-10 sm:px-10 sm:pb-10 sm:pt-12 lg:min-h-dvh lg:py-16">
-          <div className="pointer-events-none absolute inset-0 -z-10" style={{ background: canvasBackdrop }} />
-          <AuthHero />
-        </section>
+      <div className="min-h-dvh bg-[#f7f7fa] lg:grid lg:grid-cols-[1.04fr_1fr]">
+        <AuthHero />
 
-        <section className="relative flex items-center justify-center border-t border-hair/70 bg-[#fbfbfd]/80 px-4 pb-12 pt-10 lg:min-h-dvh lg:border-l lg:border-t-0 lg:px-10 lg:py-14">
+        <section className="relative isolate flex items-center justify-center px-4 pb-10 pt-8 sm:px-6 sm:pb-12 lg:min-h-dvh lg:px-10 lg:py-12">
+          <div className="pointer-events-none absolute inset-0 -z-10" style={{ background: canvasBackdrop }} />
           <div className="w-full max-w-[420px]">{children}</div>
         </section>
       </div>

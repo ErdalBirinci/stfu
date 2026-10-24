@@ -1,10 +1,9 @@
 import { useState } from 'react'
 import { Navigate } from 'react-router-dom'
-import { ArrowRight, MailCheck, ShieldCheck } from 'lucide-react'
+import { ArrowRight, Lock, MailCheck, ShieldCheck } from 'lucide-react'
 import { AuthShell } from '../components/Layout'
 import { Spinner } from '../components/Ui'
 import { useAuth } from '../lib/auth'
-import { cn } from '../lib/cn'
 import { normalizeEmail, INTERNAL_EMAIL_DOMAIN } from '../lib/format'
 
 type Mode = 'signin' | 'signup'
@@ -88,8 +87,8 @@ export function LoginPage() {
 
   return (
     <AuthShell variant="split">
-      <div className="card overflow-hidden p-6 sm:p-7">
-        <div className="mb-5">
+      <div className="card overflow-hidden p-6 sm:p-8">
+        <div className="mb-6">
           <h1 className="text-[23px] font-semibold tracking-[-0.03em]">
             {mode === 'signin' ? 'Welcome back' : 'Ask to join the circle'}
           </h1>
@@ -214,9 +213,15 @@ export function LoginPage() {
         </div>
       </div>
 
-      <div className="mt-5 flex items-center justify-center gap-2 text-[11.5px] text-faint">
-        <span className={cn('inline-block size-1.5 rounded-full bg-[#b9c3d3]')} />
-        Built for a small, closed group
+      <div className="mt-6 flex flex-wrap items-center justify-center gap-x-5 gap-y-2 text-[11.5px] text-faint">
+        <span className="inline-flex items-center gap-1.5">
+          <ShieldCheck className="size-3.5" />
+          Manually approved
+        </span>
+        <span className="inline-flex items-center gap-1.5">
+          <Lock className="size-3.5" />
+          Private by default
+        </span>
       </div>
     </AuthShell>
   )
