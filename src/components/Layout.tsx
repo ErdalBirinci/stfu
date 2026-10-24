@@ -4,6 +4,7 @@ import { useAuth } from '../lib/auth'
 import { cn } from '../lib/cn'
 import { Avatar } from './Avatar'
 import { Logo, LogoMark } from './Logo'
+import { Wordmark3D } from './Wordmark3D'
 
 const navigation = [
   { to: '/', label: 'Timeline', icon: Home, end: true },
@@ -129,7 +130,7 @@ export function AppLayout() {
   )
 }
 
-export function AuthShell({ children }: { children: React.ReactNode }) {
+export function AuthShell({ children, hero = false }: { children: React.ReactNode; hero?: boolean }) {
   return (
     <div className="relative flex min-h-dvh items-center justify-center overflow-hidden px-4 py-10">
       <div
@@ -141,11 +142,20 @@ export function AuthShell({ children }: { children: React.ReactNode }) {
       />
       <div className="w-full max-w-[420px]">
         <div className="mb-6 flex justify-center">
-          <span className="inline-flex items-center gap-2.5 rounded-full border border-white/70 bg-white/70 px-3 py-1.5 shadow-[0_10px_30px_-24px_rgba(20,20,43,0.5)] backdrop-blur">
-            <LogoMark className="size-6 rounded-lg" />
-            <span className="text-[13px] font-semibold tracking-[-0.02em]">STFU</span>
-            <span className="text-[11px] text-faint">private circle</span>
-          </span>
+          {hero ? (
+            <div className="flex flex-col items-center gap-3">
+              <Wordmark3D />
+              <span className="text-[10px] font-semibold uppercase tracking-[0.3em] text-faint">
+                private circle
+              </span>
+            </div>
+          ) : (
+            <span className="inline-flex items-center gap-2.5 rounded-full border border-white/70 bg-white/70 px-3 py-1.5 shadow-[0_10px_30px_-24px_rgba(20,20,43,0.5)] backdrop-blur">
+              <LogoMark className="size-6 rounded-lg" />
+              <span className="text-[13px] font-semibold tracking-[-0.02em]">STFU</span>
+              <span className="text-[11px] text-faint">private circle</span>
+            </span>
+          )}
         </div>
         {children}
       </div>

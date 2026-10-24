@@ -24,7 +24,7 @@ export function LoginPage() {
   if (session) {
     if (!profile) {
       return (
-        <AuthShell>
+        <AuthShell hero>
           <div className="card flex flex-col items-center gap-3 px-6 py-10 text-center">
             <Spinner className="size-5 text-muted" />
             <p className="text-[13px] text-muted">Signing you in…</p>
@@ -87,7 +87,7 @@ export function LoginPage() {
   }
 
   return (
-    <AuthShell>
+    <AuthShell hero>
       <div className="card overflow-hidden p-6 sm:p-7">
         <div className="mb-5">
           <h1 className="text-[23px] font-semibold tracking-[-0.03em]">
