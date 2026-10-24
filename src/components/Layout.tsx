@@ -130,32 +130,46 @@ export function AppLayout() {
   )
 }
 
-export function AuthShell({ children, hero = false }: { children: React.ReactNode; hero?: boolean }) {
+const canvasBackdrop =
+  'radial-gradient(900px 520px at 12% 0%, #e2edff 0%, rgba(226,237,255,0) 62%), radial-gradient(760px 520px at 88% 8%, #f6e9ff 0%, rgba(246,233,255,0) 58%), radial-gradient(900px 620px at 50% 110%, #e9f7f1 0%, rgba(233,247,241,0) 60%), #f7f7fa'
+
+export function AuthShell({
+  children,
+  variant = 'center',
+}: {
+  children: React.ReactNode
+  variant?: 'center' | 'split'
+}) {
+  if (variant === 'split') {
+    return (
+      <div className="min-h-dvh bg-[#fbfbfd] lg:grid lg:grid-cols-2">
+        <section className="relative flex items-center justify-center overflow-hidden px-6 pb-8 pt-10 sm:px-10 sm:pb-10 sm:pt-12 lg:min-h-dvh lg:py-16">
+          <div className="pointer-events-none absolute inset-0 -z-10" style={{ background: canvasBackdrop }} />
+          <div className="relative flex w-full max-w-[430px] flex-col items-center gap-4 text-center sm:gap-5">
+            <Wordmark3D fun />
+            <p className="hidden max-w-[290px] text-[13px] leading-relaxed text-muted sm:block">
+              A quiet corner of the internet, kept for a loud little circle of friends.
+            </p>
+          </div>
+        </section>
+
+        <section className="relative flex items-center justify-center border-t border-hair/70 bg-[#fbfbfd]/80 px-4 pb-12 pt-10 lg:min-h-dvh lg:border-l lg:border-t-0 lg:px-10 lg:py-14">
+          <div className="w-full max-w-[420px]">{children}</div>
+        </section>
+      </div>
+    )
+  }
+
   return (
     <div className="relative flex min-h-dvh items-center justify-center overflow-hidden px-4 py-10">
-      <div
-        className="pointer-events-none absolute inset-0 -z-10"
-        style={{
-          background:
-            'radial-gradient(900px 520px at 12% 0%, #e2edff 0%, rgba(226,237,255,0) 62%), radial-gradient(760px 520px at 88% 8%, #f6e9ff 0%, rgba(246,233,255,0) 58%), radial-gradient(900px 620px at 50% 110%, #e9f7f1 0%, rgba(233,247,241,0) 60%), #f7f7fa',
-        }}
-      />
+      <div className="pointer-events-none absolute inset-0 -z-10" style={{ background: canvasBackdrop }} />
       <div className="w-full max-w-[420px]">
         <div className="mb-6 flex justify-center">
-          {hero ? (
-            <div className="flex flex-col items-center gap-3">
-              <Wordmark3D />
-              <span className="text-[10px] font-semibold uppercase tracking-[0.3em] text-faint">
-                private circle
-              </span>
-            </div>
-          ) : (
-            <span className="inline-flex items-center gap-2.5 rounded-full border border-white/70 bg-white/70 px-3 py-1.5 shadow-[0_10px_30px_-24px_rgba(20,20,43,0.5)] backdrop-blur">
-              <LogoMark className="size-6 rounded-lg" />
-              <span className="text-[13px] font-semibold tracking-[-0.02em]">STFU</span>
-              <span className="text-[11px] text-faint">private circle</span>
-            </span>
-          )}
+          <span className="inline-flex items-center gap-2.5 rounded-full border border-white/70 bg-white/70 px-3 py-1.5 shadow-[0_10px_30px_-24px_rgba(20,20,43,0.5)] backdrop-blur">
+            <LogoMark className="size-6 rounded-lg" />
+            <span className="text-[13px] font-semibold tracking-[-0.02em]">STFU</span>
+            <span className="text-[11px] text-faint">private circle</span>
+          </span>
         </div>
         {children}
       </div>

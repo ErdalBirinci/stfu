@@ -235,8 +235,10 @@
   }
 
   .wordmark__word {
+    --tilt: 0deg;
     position: relative;
     display: block;
+    transform: rotate(var(--tilt));
     font-size: clamp(2.05rem, 10.4vw, 2.6rem);
     font-weight: 900;
     line-height: 0.95;
@@ -291,7 +293,9 @@
     -webkit-mask-image: linear-gradient(to bottom, rgba(0, 0, 0, 0.85), rgba(0, 0, 0, 0) 68%);
   }
 
-  .wordmark__reflection .wordmark__float {
+  .wordmark__reflection .wordmark__float,
+  .wordmark__reflection .wordmark__word,
+  .wordmark--fun .wordmark__reflection .wordmark__word {
     animation: none;
   }
 
@@ -299,6 +303,121 @@
     transform: scaleY(-1) rotateX(16deg);
     transform-origin: 50% 0%;
     filter: none;
+  }
+
+  /* Playful hero wordmark: tilted lines, sticker chips, sparkles, marker swoosh. */
+  .wordmark--fun .wordmark__word {
+    font-size: clamp(2.25rem, 7vw, 3.5rem);
+    --tilt: -3.4deg;
+    animation: wordmark-bob 6.4s ease-in-out infinite;
+  }
+
+  .wordmark--fun .wordmark__word:nth-child(2) {
+    --tilt: 2.2deg;
+    animation-delay: -2.3s;
+  }
+
+  .wordmark--fun .wordmark__plate {
+    gap: 0.12em;
+    transform: rotateX(13deg) rotateZ(0deg);
+  }
+
+  .wordmark--fun:hover .wordmark__plate {
+    transform: rotateX(6deg) rotateZ(0deg) translateY(-3px);
+  }
+
+  .wordmark--fun .wordmark__glow {
+    inset: -26% -18% -12%;
+    background:
+      radial-gradient(58% 56% at 34% 34%, rgba(10, 108, 245, 0.24), rgba(10, 108, 245, 0) 70%),
+      radial-gradient(54% 52% at 72% 28%, rgba(255, 95, 162, 0.2), rgba(255, 95, 162, 0) 70%),
+      radial-gradient(52% 50% at 52% 82%, rgba(122, 92, 255, 0.18), rgba(122, 92, 255, 0) 72%);
+    filter: blur(10px);
+  }
+
+  .wordmark__swoosh {
+    width: 88%;
+    margin-top: -0.15em;
+    margin-bottom: 0.05em;
+    opacity: 0.8;
+    transform: rotate(-1.4deg);
+    pointer-events: none;
+  }
+
+  .wordmark__spark {
+    position: absolute;
+    font-size: 1rem;
+    line-height: 1;
+    pointer-events: none;
+    animation: wordmark-twinkle 4.2s ease-in-out infinite;
+  }
+
+  .wordmark__spark--a {
+    top: 4%;
+    left: 1%;
+    font-size: 1.15rem;
+    color: #0a6cf5;
+  }
+
+  .wordmark__spark--b {
+    top: 0;
+    right: 8%;
+    color: #c06bff;
+    animation-delay: -1.4s;
+  }
+
+  .wordmark__spark--c {
+    bottom: 26%;
+    right: -1%;
+    font-size: 0.85rem;
+    color: #ffa63d;
+    animation-delay: -2.6s;
+  }
+
+  .wordmark__chip {
+    position: absolute;
+    z-index: 1;
+    display: none;
+    align-items: center;
+    gap: 0.32rem;
+    padding: 0.32rem 0.62rem;
+    border-radius: 999px;
+    border: 1px solid rgba(255, 255, 255, 0.9);
+    background: rgba(255, 255, 255, 0.84);
+    box-shadow: 0 8px 20px -12px rgba(20, 20, 43, 0.45);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    font-size: 0.68rem;
+    font-weight: 700;
+    letter-spacing: 0.01em;
+    color: #4b4b52;
+    white-space: nowrap;
+    pointer-events: none;
+  }
+
+  .wordmark__chip-emoji {
+    font-size: 0.8rem;
+    line-height: 1;
+  }
+
+  .wordmark__chip--a {
+    top: -0.4rem;
+    left: -1.2rem;
+    transform: rotate(-7deg);
+    animation: wordmark-drift 7s ease-in-out infinite;
+  }
+
+  .wordmark__chip--b {
+    right: -1rem;
+    bottom: 1.6rem;
+    transform: rotate(5deg);
+    animation: wordmark-drift 8.4s ease-in-out infinite reverse;
+  }
+
+  @media (min-width: 640px) {
+    .wordmark__chip {
+      display: inline-flex;
+    }
   }
 
   .stagger > * {
@@ -337,6 +456,38 @@
   }
 }
 
+@keyframes wordmark-bob {
+  0%,
+  100% {
+    transform: rotate(var(--tilt)) translateY(0);
+  }
+  50% {
+    transform: rotate(var(--tilt)) translateY(-7px);
+  }
+}
+
+@keyframes wordmark-twinkle {
+  0%,
+  100% {
+    opacity: 0.25;
+    transform: scale(0.8) rotate(0deg);
+  }
+  45% {
+    opacity: 1;
+    transform: scale(1.15) rotate(25deg);
+  }
+}
+
+@keyframes wordmark-drift {
+  0%,
+  100% {
+    translate: 0 0;
+  }
+  50% {
+    translate: 0 -6px;
+  }
+}
+
 @keyframes wordmark-float {
   0%,
   100% {
@@ -369,7 +520,10 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .wordmark__float {
+  .wordmark__float,
+  .wordmark__word,
+  .wordmark__spark,
+  .wordmark__chip {
     animation: none;
   }
 
