@@ -1,0 +1,340 @@
+import { supabase } from './supabase'
+import { attachMediaUrls, removeStorageObjects, uploadMediaFiles } from './media'
+import type {
+  AdminStats,
+  CircleEvent,
+  Comment,
+  MediaItem,
+  Member,
+  MemberStatus,
+  Memory,
+  Post,
+  Profile,
+  Role,
+  RsvpStatus,
+} from './types'
+
+const PROFILE_FIELDS = 'id, display_name, avatar_url, bio, role, status, created_at, approved_at'
+const MEDIA_FIELDS =
+  'id, owner_id, kind, storage_path, file_name, mime_type, size_bytes, post_id, comment_id, memory_id, created_at'
+const POST_FIELDS = `id, author_id, title, body, created_at, updated_at,
+  author:profiles!posts_author_id_fkey(${PROFILE_FIELDS}),
+  media(${MEDIA_FIELDS}),
+  comments(count)`
+const EVENT_FIELDS = `id, title, description, location, starts_at, ends_at, all_day, created_by, created_at,
+  creator:profiles!events_created_by_fkey(${PROFILE_FIELDS}),
+  attendees:event_attendees(status, user_id, created_at, profile:profiles!event_attendees_user_id_fkey(${PROFILE_FIELDS}))`
+const MEMORY_FIELDS = `id, title, description, taken_on, created_by, created_at,
+  creator:profiles!memories_created_by_fkey(${PROFILE_FIELDS}),
+  media(${MEDIA_FIELDS})`
+
+async function currentUserId(): Promise<string> {
+  const { data, error } = await supabase.auth.getUser()
+  if (error || !data.user) throw new Error('Your session has expired. Please sign in again.')
+  return data.user.id
+}
+
+async function hydrateMedia(rows: Array<{ media?: MediaItem[] }>): Promise<void> {
+  const all = rows.flatMap((row) => row.media ?? [])
+  if (all.length === 0) return
+  const resolved = await attachMediaUrls(all)
+  const byId = new Map(resolved.map((item) => [item.id, item]))
+  for (const row of rows) {
+    row.media = (row.media ?? []).map((item) => byId.get(item.id) ?? item)
+  }
+}
+
+export function commentCount(post: Post): number {
+  return post.comments?.[0]?.count ?? 0
+}
+
+/* ---------------------------------- feed --------------------------------- */
+
+export async function fetchFeed(limit = 40): Promise<Post[]> {
+  const { data, error } = await supabase
+    .from('posts')
+    .select(POST_FIELDS)
+    .order('created_at', { ascending: false })
+    .limit(limit)
+  if (error) throw error
+  const posts = (data ?? []) as unknown as Post[]
+  await hydrateMedia(posts)
+  return posts
+}
+
+export async function fetchPost(id: string): Promise<{ post: Post; comments: Comment[] }> {
+  const { data, error } = await supabase.from('posts').select(POST_FIELDS).eq('id', id).single()
+  if (error) throw error
+  const post = data as unknown as Post
+
+  const { data: commentRows, error: commentError } = await supabase
+    .from('comments')
+    .select(
+      `id, post_id, author_id, parent_id, body, created_at,
+       author:profiles!comments_author_id_fkey(${PROFILE_FIELDS}),
+       media(${MEDIA_FIELDS})`,
+    )
+    .eq('post_id', id)
+    .order('created_at', { ascending: true })
+  if (commentError) throw commentError
+
+  const comments = (commentRows ?? []) as unknown as Comment[]
+  await hydrateMedia([post, ...comments])
+  return { post, comments }
+}
+
+export async function createPost(input: { title: string; body: string; files: File[] }): Promise<string> {
+  const authorId = await currentUserId()
+  const { data, error } = await supabase
+    .from('posts')
+    .insert({ author_id: authorId, title: input.title.trim(), body: input.body.trim() })
+    .select('id')
+    .single()
+  if (error) throw error
+  const postId = (data as { id: string }).id
+  await uploadMediaFiles(authorId, input.files, { post_id: postId })
+  return postId
+}
+
+export async function deletePost(postId: string): Promise<void> {
+  const { data } = await supabase.from('media').select('storage_path').eq('post_id', postId)
+  const paths = (data ?? []).map((row) => (row as { storage_path: string }).storage_path)
+  const { error } = await supabase.from('posts').delete().eq('id', postId)
+  if (error) throw error
+  await removeStorageObjects(paths)
+}
+
+export async function addComment(input: {
+  postId: string
+  body: string
+  parentId?: string | null
+  files: File[]
+}): Promise<void> {
+  const authorId = await currentUserId()
+  const { data, error } = await supabase
+    .from('comments')
+    .insert({
+      post_id: input.postId,
+      author_id: authorId,
+      parent_id: input.parentId ?? null,
+      body: input.body.trim(),
+    })
+    .select('id')
+    .single()
+  if (error) throw error
+  await uploadMediaFiles(authorId, input.files, {
+    comment_id: (data as { id: string }).id,
+    post_id: input.postId,
+  })
+}
+
+/* --------------------------------- events -------------------------------- */
+
+export async function fetchEvents(fromISO: string, toISO: string): Promise<CircleEvent[]> {
+  const { data, error } = await supabase
+    .from('events')
+    .select(EVENT_FIELDS)
+    .gte('starts_at', fromISO)
+    .lte('starts_at', toISO)
+    .order('starts_at', { ascending: true })
+  if (error) throw error
+  return (data ?? []) as unknown as CircleEvent[]
+}
+
+export async function fetchUpcomingEvents(limit = 5): Promise<CircleEvent[]> {
+  const { data, error } = await supabase
+    .from('events')
+    .select(EVENT_FIELDS)
+    .gte('starts_at', new Date(Date.now() - 12 * 60 * 60 * 1000).toISOString())
+    .order('starts_at', { ascending: true })
+    .limit(limit)
+  if (error) throw error
+  return (data ?? []) as unknown as CircleEvent[]
+}
+
+export async function fetchEvent(id: string): Promise<CircleEvent> {
+  const { data, error } = await supabase.from('events').select(EVENT_FIELDS).eq('id', id).single()
+  if (error) throw error
+  return data as unknown as CircleEvent
+}
+
+export async function createEvent(input: {
+  title: string
+  description: string
+  location: string
+  startsAt: string
+  endsAt: string | null
+  allDay: boolean
+}): Promise<string> {
+  const createdBy = await currentUserId()
+  const { data, error } = await supabase
+    .from('events')
+    .insert({
+      title: input.title.trim(),
+      description: input.description.trim() || null,
+      location: input.location.trim() || null,
+      starts_at: input.startsAt,
+      ends_at: input.endsAt,
+      all_day: input.allDay,
+      created_by: createdBy,
+    })
+    .select('id')
+    .single()
+  if (error) throw error
+  return (data as { id: string }).id
+}
+
+export async function deleteEvent(eventId: string): Promise<void> {
+  const { error } = await supabase.from('events').delete().eq('id', eventId)
+  if (error) throw error
+}
+
+export async function setRsvp(eventId: string, status: RsvpStatus): Promise<void> {
+  const userId = await currentUserId()
+  const { error } = await supabase
+    .from('event_attendees')
+    .upsert({ event_id: eventId, user_id: userId, status }, { onConflict: 'event_id,user_id' })
+  if (error) throw error
+}
+
+export async function clearRsvp(eventId: string): Promise<void> {
+  const userId = await currentUserId()
+  const { error } = await supabase
+    .from('event_attendees')
+    .delete()
+    .eq('event_id', eventId)
+    .eq('user_id', userId)
+  if (error) throw error
+}
+
+/* -------------------------------- memories ------------------------------- */
+
+export async function fetchMemories(): Promise<Memory[]> {
+  const { data, error } = await supabase
+    .from('memories')
+    .select(MEMORY_FIELDS)
+    .order('created_at', { ascending: false })
+  if (error) throw error
+  const memories = (data ?? []) as unknown as Memory[]
+  await hydrateMedia(memories)
+  return memories
+}
+
+export async function fetchMemory(id: string): Promise<Memory> {
+  const { data, error } = await supabase.from('memories').select(MEMORY_FIELDS).eq('id', id).single()
+  if (error) throw error
+  const memory = data as unknown as Memory
+  await hydrateMedia([memory])
+  return memory
+}
+
+export async function createMemory(input: {
+  title: string
+  description: string
+  takenOn: string | null
+  files: File[]
+}): Promise<string> {
+  const createdBy = await currentUserId()
+  const { data, error } = await supabase
+    .from('memories')
+    .insert({
+      title: input.title.trim(),
+      description: input.description.trim() || null,
+      taken_on: input.takenOn,
+      created_by: createdBy,
+    })
+    .select('id')
+    .single()
+  if (error) throw error
+  const memoryId = (data as { id: string }).id
+  await uploadMediaFiles(createdBy, input.files, { memory_id: memoryId })
+  return memoryId
+}
+
+export async function addMemoryMedia(memoryId: string, files: File[]): Promise<void> {
+  const userId = await currentUserId()
+  await uploadMediaFiles(userId, files, { memory_id: memoryId })
+}
+
+export async function deleteMemory(memoryId: string): Promise<void> {
+  const { data } = await supabase.from('media').select('storage_path').eq('memory_id', memoryId)
+  const paths = (data ?? []).map((row) => (row as { storage_path: string }).storage_path)
+  const { error } = await supabase.from('memories').delete().eq('id', memoryId)
+  if (error) throw error
+  await removeStorageObjects(paths)
+}
+
+/* --------------------------------- profile ------------------------------- */
+
+export async function fetchProfile(userId: string): Promise<Profile | null> {
+  const { data, error } = await supabase
+    .from('profiles')
+    .select(PROFILE_FIELDS)
+    .eq('id', userId)
+    .maybeSingle()
+  if (error) throw error
+  return (data as unknown as Profile) ?? null
+}
+
+export async function updateProfile(input: {
+  displayName: string
+  bio: string
+  avatarPath: string | null
+}): Promise<Profile> {
+  const userId = await currentUserId()
+  const { data, error } = await supabase
+    .from('profiles')
+    .update({
+      display_name: input.displayName.trim(),
+      bio: input.bio.trim() || null,
+      avatar_url: input.avatarPath,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', userId)
+    .select(PROFILE_FIELDS)
+    .single()
+  if (error) throw error
+  return data as unknown as Profile
+}
+
+/* ---------------------------------- admin -------------------------------- */
+
+export async function fetchMembers(): Promise<Member[]> {
+  const { data, error } = await supabase.rpc('admin_members')
+  if (error) throw error
+  return (data ?? []) as Member[]
+}
+
+export async function setMemberStatus(userId: string, status: MemberStatus): Promise<void> {
+  const { error } = await supabase
+    .from('profiles')
+    .update({
+      status,
+      approved_at: status === 'approved' ? new Date().toISOString() : null,
+    })
+    .eq('id', userId)
+  if (error) throw error
+}
+
+export async function setMemberRole(userId: string, role: Role): Promise<void> {
+  const { error } = await supabase.from('profiles').update({ role }).eq('id', userId)
+  if (error) throw error
+}
+
+export async function fetchAdminStats(): Promise<AdminStats> {
+  const countOf = async (table: string, filter?: { column: string; value: string }) => {
+    let query = supabase.from(table).select('id', { count: 'exact', head: true })
+    if (filter) query = query.eq(filter.column, filter.value)
+    const { count } = await query
+    return count ?? 0
+  }
+
+  const [members, pending, posts, events, memories] = await Promise.all([
+    countOf('profiles', { column: 'status', value: 'approved' }),
+    countOf('profiles', { column: 'status', value: 'pending' }),
+    countOf('posts'),
+    countOf('events'),
+    countOf('memories'),
+  ])
+  return { members, pending, posts, events, memories }
+}
