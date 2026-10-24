@@ -240,7 +240,11 @@ export function PostDetailPage() {
             </div>
           </div>
 
-          <h1 className="mt-4 text-[24px] font-semibold leading-tight tracking-[-0.03em]">{post.title}</h1>
+          {post.title ? (
+            <h1 className="mt-4 text-[24px] font-semibold leading-tight tracking-[-0.03em]">
+              {post.title}
+            </h1>
+          ) : null}
           {post.body ? (
             <p className="mt-2.5 whitespace-pre-line text-[14.5px] leading-[1.7] text-[#33333a]">{post.body}</p>
           ) : null}

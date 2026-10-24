@@ -26,12 +26,10 @@ export function Composer({ onPosted }: { onPosted: (postId: string) => void }) {
   }
 
   async function submit() {
-    if (title.trim().length < 3) {
-      toast('Give your post a title of at least 3 characters.', 'error')
-      return
-    }
-    if (!body.trim() && files.length === 0) {
-      toast('Write a few words or attach something.', 'error')
+    // Nothing is required beyond having something to say: a title, some text or
+    // an attachment is enough on its own.
+    if (!title.trim() && !body.trim() && files.length === 0) {
+      toast('Add something first — a title, a few words or a file.', 'error')
       return
     }
     setSaving(true)
@@ -72,8 +70,8 @@ export function Composer({ onPosted }: { onPosted: (postId: string) => void }) {
             autoFocus
             value={title}
             onChange={(event) => setTitle(event.target.value)}
-            placeholder="A title for your post"
-            maxLength={120}
+            placeholder="A title for your post (optional)"
+            maxLength={140}
             className="w-full border-0 bg-transparent p-0 text-[16.5px] font-semibold tracking-[-0.02em] outline-none placeholder:font-semibold placeholder:text-[#b3b3ba]"
           />
           <textarea
@@ -81,7 +79,7 @@ export function Composer({ onPosted }: { onPosted: (postId: string) => void }) {
             onChange={(event) => setBody(event.target.value)}
             placeholder="Say more, add context, or drop a memory…"
             rows={3}
-            maxLength={4000}
+            maxLength={8000}
             className="mt-1.5 w-full resize-none border-0 bg-transparent p-0 text-[14px] leading-relaxed text-[#33333a] outline-none placeholder:text-[#a9a9b0]"
           />
         </div>
@@ -92,7 +90,7 @@ export function Composer({ onPosted }: { onPosted: (postId: string) => void }) {
       </div>
 
       <div className="flex items-center justify-between gap-2 border-t border-hair/70 bg-[#fcfcfe] px-4 py-2.5">
-        <span className="text-[11.5px] text-faint">{body.length}/4000</span>
+        <span className="text-[11.5px] text-faint">{body.length}/8000</span>
         <div className="flex items-center gap-2">
           <button type="button" onClick={reset} className="btn btn-ghost !px-3 !py-1.5" disabled={saving}>
             Cancel

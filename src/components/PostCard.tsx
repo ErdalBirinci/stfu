@@ -61,7 +61,9 @@ export function PostCard({ post, onDeleted }: { post: Post; onDeleted?: (id: str
       </div>
 
       <Link to={`/post/${post.id}`} className="mt-3 block">
-        <h2 className="text-[17.5px] font-semibold leading-snug tracking-[-0.022em]">{post.title}</h2>
+        {post.title ? (
+          <h2 className="text-[17.5px] font-semibold leading-snug tracking-[-0.022em]">{post.title}</h2>
+        ) : null}
         {post.body ? (
           <p className="mt-1.5 line-clamp-4 whitespace-pre-line text-[14px] leading-relaxed text-[#3c3c41]">
             {post.body}
@@ -128,7 +130,9 @@ export function PostCard({ post, onDeleted }: { post: Post; onDeleted?: (id: str
           </>
         }
       >
-        <p className="rounded-xl bg-[#f7f7fa] px-3.5 py-3 text-[13px] text-muted">{post.title}</p>
+        <p className="rounded-xl bg-[#f7f7fa] px-3.5 py-3 text-[13px] text-muted">
+          {post.title || post.body || 'A post with an attachment'}
+        </p>
       </Modal>
     </article>
   )
