@@ -4,7 +4,7 @@ import { useAuth } from '../lib/auth'
 import { cn } from '../lib/cn'
 import { Avatar } from './Avatar'
 import { Logo, LogoMark } from './Logo'
-import { Wordmark3D } from './Wordmark3D'
+import { AuthHero } from './AuthHero'
 
 const navigation = [
   { to: '/', label: 'Timeline', icon: Home, end: true },
@@ -145,12 +145,7 @@ export function AuthShell({
       <div className="min-h-dvh bg-[#fbfbfd] lg:grid lg:grid-cols-2">
         <section className="relative flex items-center justify-center overflow-hidden px-6 pb-8 pt-10 sm:px-10 sm:pb-10 sm:pt-12 lg:min-h-dvh lg:py-16">
           <div className="pointer-events-none absolute inset-0 -z-10" style={{ background: canvasBackdrop }} />
-          <div className="relative flex w-full max-w-[430px] flex-col items-center gap-4 text-center sm:gap-5">
-            <Wordmark3D fun />
-            <p className="hidden max-w-[290px] text-[13px] leading-relaxed text-muted sm:block">
-              A quiet corner of the internet, kept for a loud little circle of friends.
-            </p>
-          </div>
+          <AuthHero />
         </section>
 
         <section className="relative flex items-center justify-center border-t border-hair/70 bg-[#fbfbfd]/80 px-4 pb-12 pt-10 lg:min-h-dvh lg:border-l lg:border-t-0 lg:px-10 lg:py-14">
