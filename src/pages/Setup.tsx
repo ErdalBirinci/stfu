@@ -29,7 +29,7 @@ export function SetupPage() {
         </span>
         <h1 className="text-[22px] font-semibold tracking-[-0.03em]">Connect a Supabase project</h1>
         <p className="mt-1.5 text-[13px] leading-relaxed text-muted">
-          Dobby keeps everything in your own Supabase project: accounts, the timeline, events, albums and the
+          STFU keeps everything in your own Supabase project: accounts, the timeline, events, albums and the
           private media bucket. Until it has a project to talk to, it stays on this screen.
         </p>
 

@@ -143,7 +143,7 @@ export function AuthShell({ children }: { children: React.ReactNode }) {
         <div className="mb-6 flex justify-center">
           <span className="inline-flex items-center gap-2.5 rounded-full border border-white/70 bg-white/70 px-3 py-1.5 shadow-[0_10px_30px_-24px_rgba(20,20,43,0.5)] backdrop-blur">
             <LogoMark className="size-6 rounded-lg" />
-            <span className="text-[13px] font-semibold tracking-[-0.02em]">Dobby</span>
+            <span className="text-[13px] font-semibold tracking-[-0.02em]">STFU</span>
             <span className="text-[11px] text-faint">private circle</span>
           </span>
         </div>

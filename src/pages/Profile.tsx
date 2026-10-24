@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { Camera, LogOut, ShieldCheck } from 'lucide-react'
 import { updateProfile } from '../lib/api'
 import { useAuth } from '../lib/auth'
-import { fullDate } from '../lib/format'
+import { displayEmail, fullDate } from '../lib/format'
 import { uploadAvatar } from '../lib/media'
 import { Avatar } from '../components/Avatar'
 import { useToast } from '../components/Toast'
@@ -113,7 +113,7 @@ export function ProfilePage() {
 
           <div className="min-w-0 text-center sm:text-left">
             <p className="truncate text-[18px] font-semibold">{displayName || 'Your name'}</p>
-            <p className="text-[12.5px] text-muted">{session?.user.email}</p>
+            <p className="text-[12.5px] text-muted">{displayEmail(session?.user.email)}</p>
             <div className="mt-1.5 flex flex-wrap items-center justify-center gap-1.5 sm:justify-start">
               <span className="rounded-full bg-[#f2f4f8] px-2 py-0.5 text-[10.5px] font-semibold uppercase tracking-[0.06em] text-muted">
                 {profile?.role === 'admin' ? 'Admin' : 'Member'}
@@ -168,7 +168,7 @@ export function ProfilePage() {
         <dl className="mt-3 space-y-2.5 text-[12.5px]">
           <div className="flex items-center justify-between gap-4">
             <dt className="text-muted">Email</dt>
-            <dd className="truncate font-medium">{session?.user.email}</dd>
+            <dd className="truncate font-medium">{displayEmail(session?.user.email)}</dd>
           </div>
           <div className="flex items-center justify-between gap-4">
             <dt className="text-muted">Member since</dt>

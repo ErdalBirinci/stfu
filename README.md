@@ -1,7 +1,8 @@
-# Dobby
+# STFU
 
 A small, closed friendship site for one group of people: a shared timeline, an event
-calendar, and an archive of photos, clips and voice notes.
+calendar, and an archive of photos, clips and voice notes. **Dobby** is the admin of the
+circle, and the admin dashboard lives at `/dobby`.
 
 Everything runs on your own **Supabase** free-tier project and the app itself is a
 static React build that can live on **GitHub Pages**. There is no server to run.
@@ -103,6 +104,9 @@ project is never stuck waiting for an approver.
 ---
 
 ## Deploy to GitHub Pages
+
+The live site is https://erdalbirinci.github.io/stfu/ and the admin dashboard is
+https://erdalbirinci.github.io/stfu/dobby.
 
 1. Create a **public** repository and push this project to `main`.
 2. In the repository: **Settings → Secrets and variables → Actions → New repository secret**, add

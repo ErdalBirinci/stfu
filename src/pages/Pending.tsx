@@ -3,6 +3,7 @@ import { Hourglass, LogOut, RefreshCw, ShieldX } from 'lucide-react'
 import { AuthShell } from '../components/Layout'
 import { Spinner } from '../components/Ui'
 import { useAuth } from '../lib/auth'
+import { displayEmail } from '../lib/format'
 
 export function PendingPage() {
   const { profile, session, refresh, signOut } = useAuth()
@@ -50,14 +51,14 @@ export function PendingPage() {
             ? 'An admin has closed access to this account. Send the group a message if you think this is a mistake.'
             : missingProfile
               ? 'We could not read your member profile yet. Give it a moment and check again.'
-              : 'Dobby is a closed circle. As soon as an admin approves you, the timeline, calendar and memories open up on their own.'}
+              : 'STFU is a closed circle. As soon as an admin approves you, the timeline, calendar and memories open up on their own.'}
         </p>
 
         {profile ? (
           <div className="mt-5 rounded-2xl border border-hair bg-[#fbfbfd] px-4 py-3 text-left">
             <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-faint">Signed in as</p>
             <p className="mt-1 truncate text-[13px] font-medium">{profile.display_name}</p>
-            <p className="truncate text-[12px] text-muted">{session?.user.email}</p>
+            <p className="truncate text-[12px] text-muted">{displayEmail(session?.user.email)}</p>
           </div>
         ) : null}
 

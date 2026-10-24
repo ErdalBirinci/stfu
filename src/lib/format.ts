@@ -73,6 +73,20 @@ export function toLocalInputValue(date: Date): string {
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`
 }
 
+/** Accounts made with a bare username live on this internal domain. */
+export const INTERNAL_EMAIL_DOMAIN = 'stfu.local'
+
+export function normalizeEmail(value: string): string {
+  const clean = value.trim().toLowerCase()
+  return clean.includes('@') ? clean : `${clean}@${INTERNAL_EMAIL_DOMAIN}`
+}
+
+export function displayEmail(email?: string | null): string {
+  if (!email) return ''
+  const [local, domain] = email.split('@')
+  return domain === INTERNAL_EMAIL_DOMAIN ? local : email
+}
+
 export function greeting(name: string): string {
   const hour = new Date().getHours()
   const part = hour < 12 ? 'Good morning' : hour < 18 ? 'Good afternoon' : 'Good evening'

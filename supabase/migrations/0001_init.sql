@@ -1,5 +1,5 @@
 -- ============================================================================
--- Dobby — private circle schema
+-- STFU — private circle schema
 -- Run this once in your Supabase project: SQL Editor → New query → paste → Run.
 -- It is safe to re-run: every object is created only when missing.
 -- ============================================================================

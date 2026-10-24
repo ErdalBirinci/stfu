@@ -5,6 +5,7 @@ import { AuthShell } from '../components/Layout'
 import { Spinner } from '../components/Ui'
 import { useAuth } from '../lib/auth'
 import { cn } from '../lib/cn'
+import { normalizeEmail, INTERNAL_EMAIL_DOMAIN } from '../lib/format'
 
 type Mode = 'signin' | 'signup'
 
@@ -44,9 +45,13 @@ export function LoginPage() {
     event.preventDefault()
     setError(null)
 
-    const cleanEmail = email.trim().toLowerCase()
+    if (email.trim().length < 3) {
+      setError('Enter your email address or username.')
+      return
+    }
+    const cleanEmail = normalizeEmail(email)
     if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(cleanEmail)) {
-      setError('Enter a valid email address.')
+      setError('That does not look like an email address or username.')
       return
     }
     if (password.length < 8) {
@@ -152,21 +157,26 @@ export function LoginPage() {
               </div>
             ) : null}
 
-            <div>
-              <label className="label" htmlFor="email">
-                Email
-              </label>
-              <input
-                id="email"
-                type="email"
-                className="field"
-                value={email}
-                onChange={(event) => setEmail(event.target.value)}
-                placeholder="you@example.com"
-                autoComplete="email"
-                inputMode="email"
-              />
-            </div>
+        <div>
+          <label className="label" htmlFor="email">
+            Email or username
+          </label>
+          <input
+            id="email"
+            type="text"
+            className="field"
+            value={email}
+            onChange={(event) => setEmail(event.target.value)}
+            placeholder="you@example.com or dobby_admin"
+            autoComplete="username"
+            autoCapitalize="none"
+            spellCheck={false}
+          />
+          <p className="mt-1 text-[11px] leading-relaxed text-faint">
+            A bare username is treated as an internal address on {INTERNAL_EMAIL_DOMAIN}; no mail is ever
+            sent there.
+          </p>
+        </div>
 
             <div>
               <label className="label" htmlFor="password">
@@ -198,7 +208,7 @@ export function LoginPage() {
         <div className="mt-5 flex items-start gap-2 border-t border-hair/70 pt-4 text-[11.5px] leading-relaxed text-faint">
           <ShieldCheck className="mt-0.5 size-3.5 shrink-0" />
           <span>
-            Dobby is invite-only. Your email is never shown to anyone outside the approved members of this
+            STFU is invite-only. Your email is never shown to anyone outside the approved members of this
             circle.
           </span>
         </div>
