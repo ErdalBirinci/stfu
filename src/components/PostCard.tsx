@@ -14,7 +14,16 @@ import { Modal } from './Modal'
 import { ReactionBar } from './ReactionBar'
 import { useToast } from './Toast'
 
-export function PostCard({ post, onDeleted }: { post: Post; onDeleted?: (id: string) => void }) {
+export function PostCard({
+  post,
+  onDeleted,
+  featured,
+}: {
+  post: Post
+  onDeleted?: (id: string) => void
+  /** Lifted out of the feed, e.g. the pinned post on a label page. */
+  featured?: boolean
+}) {
   const { profile } = useAuth()
   const toast = useToast()
   const navigate = useNavigate()
@@ -42,7 +51,13 @@ export function PostCard({ post, onDeleted }: { post: Post; onDeleted?: (id: str
   }
 
   return (
-    <article className="card group/card p-5 transition-shadow duration-300 hover:shadow-[0_2px_4px_rgba(20,20,43,0.05),0_18px_40px_-22px_rgba(20,20,43,0.24)]">
+    <article
+      className={cn(
+        'card group/card p-5 transition-shadow duration-300 hover:shadow-[0_2px_4px_rgba(20,20,43,0.05),0_18px_40px_-22px_rgba(20,20,43,0.24)]',
+        featured &&
+          'border-[#f2e2ba] bg-[linear-gradient(180deg,#fffdf6_0%,#ffffff_58%)] shadow-[0_14px_36px_-26px_rgba(154,106,18,0.55)]',
+      )}
+    >
       <div className="flex items-start gap-3">
         <Avatar name={author?.display_name ?? 'Member'} path={author?.avatar_url} size={38} />
         <div className="min-w-0 flex-1">

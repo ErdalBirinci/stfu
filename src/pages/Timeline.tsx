@@ -1,6 +1,6 @@
 import { useCallback } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
-import { MessagesSquare, Tag, X } from 'lucide-react'
+import { MessagesSquare, Pin, Tag, X } from 'lucide-react'
 import { Composer } from '../components/Composer'
 import { PostCard } from '../components/PostCard'
 import { EmptyState, ErrorNote, LoadingRows, PageHeader } from '../components/Ui'
@@ -30,6 +30,11 @@ export function TimelinePage() {
     },
     [data, setData],
   )
+
+  const posts = data ?? []
+  // On a label page the pinned post gets its own card, so the feed begins below it.
+  const pinnedPost = activeSlug ? (posts.find((post) => post.pinned_at) ?? null) : null
+  const feed = pinnedPost ? posts.filter((post) => post.id !== pinnedPost.id) : posts
 
   return (
     <>
@@ -99,11 +104,34 @@ export function TimelinePage() {
 
       {loading && !data ? (
         <LoadingRows />
-      ) : data && data.length > 0 ? (
-        <div className="stagger space-y-3">
-          {data.map((post) => (
-            <PostCard key={post.id} post={post} onDeleted={handleDeleted} />
-          ))}
+      ) : pinnedPost || feed.length > 0 ? (
+        <div className="space-y-5">
+          {pinnedPost ? (
+            <section aria-label="Pinned post">
+              <div className="mb-2 flex items-center gap-1.5 px-1">
+                <Pin className="size-3.5 fill-current text-[#b07c12]" />
+                <p className="text-[10.5px] font-semibold uppercase tracking-[0.14em] text-[#9a6a12]">
+                  Pinned{active ? ` in ${active.name}` : ''}
+                </p>
+              </div>
+              <PostCard post={pinnedPost} featured onDeleted={handleDeleted} />
+            </section>
+          ) : null}
+
+          {feed.length > 0 ? (
+            <section className="space-y-3">
+              {pinnedPost ? (
+                <p className="px-1 text-[10.5px] font-semibold uppercase tracking-[0.14em] text-faint">
+                  Everything else
+                </p>
+              ) : null}
+              <div className="stagger space-y-3">
+                {feed.map((post) => (
+                  <PostCard key={post.id} post={post} onDeleted={handleDeleted} />
+                ))}
+              </div>
+            </section>
+          ) : null}
         </div>
       ) : !error ? (
         <EmptyState
