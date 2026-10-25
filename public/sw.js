@@ -84,6 +84,8 @@ self.addEventListener('push', (event) => {
       body: payload.body || 'Something new in the circle.',
       icon: absolute('icons/icon-192.png'),
       badge: absolute('icons/badge-96.png'),
+      // Chrome and Android show this as the big preview; iOS ignores it.
+      image: payload.image ? new URL(payload.image, BASE).toString() : undefined,
       tag: payload.tag || 'stfu',
       data: { url: payload.url ? new URL(payload.url, BASE).toString() : BASE },
     }),

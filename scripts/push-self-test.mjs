@@ -168,7 +168,13 @@ new Function('self', 'caches', 'Response', readFileSync('public/sw.js', 'utf8'))
 const pending = []
 listeners.push[0]({
   data: {
-    json: () => ({ title: 'Özlem replied', body: 'Merhaba', url: 'post/abc', tag: 'post-abc' }),
+    json: () => ({
+      title: 'Özlem replied',
+      body: 'Merhaba',
+      url: 'post/abc',
+      tag: 'post-abc',
+      image: 'https://stiwuvmnxqwmhftkbcas.supabase.co/storage/v1/object/sign/media/u/image/a.jpg?token=t',
+    }),
     text: () => '',
   },
   waitUntil: (promise) => pending.push(promise),
@@ -181,6 +187,11 @@ assert.equal(shown[0].options.body, 'Merhaba')
 assert.equal(shown[0].options.tag, 'post-abc')
 assert.equal(shown[0].options.icon, `${scope}icons/icon-192.png`)
 assert.equal(shown[0].options.data.url, `${scope}post/abc`, 'relative url resolves inside the app')
+assert.equal(
+  shown[0].options.image,
+  'https://stiwuvmnxqwmhftkbcas.supabase.co/storage/v1/object/sign/media/u/image/a.jpg?token=t',
+  'the first photo rides along as the notification preview',
+)
 
 const clicks = []
 listeners.notificationclick[0]({
@@ -249,6 +260,26 @@ const mention = describeNotification({
 })
 assert.equal(mention.title, 'Özlem mentioned you')
 assert.equal(mention.body, '“hey @Dobby look at this”')
+
+const withPreview = describeNotification(
+  {
+    id: '6',
+    user_id: 'u',
+    kind: 'post',
+    entity_id: 'p6',
+    post_id: 'p6',
+    memory_id: null,
+    body: 'Boat day',
+    actor: { display_name: 'Juulia' },
+  },
+  {
+    media: { images: 1, videos: 0, audios: 0 },
+    preview: 'https://example.test/a.jpg?token=t',
+  },
+)
+assert.equal(withPreview.image, 'https://example.test/a.jpg?token=t')
+assert.equal(withPreview.body, '“Boat day” · 1 photo')
+assert.equal(withPhotos.image, undefined, 'no preview means no image key')
 
 const planned = describeNotification(
   {

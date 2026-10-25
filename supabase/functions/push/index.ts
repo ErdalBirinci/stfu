@@ -206,6 +206,8 @@ export interface PushContext {
   media?: MediaSummary | null
   postTitle?: string | null
   event?: { title: string; starts_at: string; location: string | null } | null
+  /** Signed URL of the first photo, shown as the notification's preview. */
+  preview?: string | null
 }
 
 const clip = (value: string | null | undefined, max = 110): string => {
@@ -242,15 +244,26 @@ function startsIn(iso: string): string {
   return `starts in ${days} days`
 }
 
-export function describeNotification(
-  row: NotificationRow,
-  context: PushContext = {},
-): {
+export interface PushMessage {
   title: string
   body: string
   url: string
   tag: string
-} {
+  image?: string
+}
+
+export function describeNotification(
+  row: NotificationRow,
+  context: PushContext = {},
+): PushMessage {
+  const message = copyFor(row, context)
+  return context.preview ? { ...message, image: context.preview } : message
+}
+
+function copyFor(
+  row: NotificationRow,
+  context: PushContext,
+): { title: string; body: string; url: string; tag: string } {
   const name = row.actor?.display_name ?? 'Someone'
   const text = clip(row.body, 140)
 
@@ -412,6 +425,25 @@ async function restRows<T>(path: string): Promise<T[]> {
 }
 
 /**
+ * The media bucket is private, so the preview has to be a signed URL. It is
+ * signed for a week: the push service fetches it while delivering, and the
+ * phone may show the notification hours later.
+ */
+async function signedMediaUrl(path: string): Promise<string | null> {
+  const encoded = path.split('/').map(encodeURIComponent).join('/')
+  const response = await fetch(`${SUPABASE_URL}/storage/v1/object/sign/media/${encoded}`, {
+    method: 'POST',
+    headers: restHeaders(),
+    body: JSON.stringify({ expiresIn: 604800 }),
+  })
+  if (!response.ok) return null
+  const data = (await response.json()) as { signedURL?: string; signedUrl?: string }
+  const signed = data.signedURL ?? data.signedUrl
+  if (!signed) return null
+  return signed.startsWith('http') ? signed : `${SUPABASE_URL}/storage/v1${signed.startsWith('/') ? '' : '/'}${signed}`
+}
+
+/**
  * The extra wording a notification needs: how many photos came with it, what
  * the reacted-to post was called, when the planned event actually starts.
  * Every lookup is best-effort — a detail may be missing, the push may not.
@@ -429,13 +461,17 @@ async function buildContext(row: NotificationRow): Promise<PushContext> {
             : (row.post_id ?? row.entity_id) && `post_id=eq.${row.post_id ?? row.entity_id}`
 
       if (parent) {
-        const media = await restRows<{ kind: string }>(`media?select=kind&${parent}`)
+        const media = await restRows<{ kind: string; storage_path: string }>(
+          `media?select=kind,storage_path&${parent}&order=created_at.asc`,
+        )
         if (media.length) {
           context.media = {
             images: media.filter((item) => item.kind === 'image').length,
             videos: media.filter((item) => item.kind === 'video').length,
             audios: media.filter((item) => item.kind === 'audio').length,
           }
+          const firstPhoto = media.find((item) => item.kind === 'image')
+          if (firstPhoto) context.preview = await signedMediaUrl(firstPhoto.storage_path)
         }
       }
     }
@@ -443,6 +479,10 @@ async function buildContext(row: NotificationRow): Promise<PushContext> {
     if (row.kind === 'reaction' && row.post_id) {
       const posts = await restRows<{ title: string }>(`posts?select=title&id=eq.${row.post_id}`)
       context.postTitle = posts[0]?.title ?? null
+      const photos = await restRows<{ storage_path: string }>(
+        `media?select=storage_path&post_id=eq.${row.post_id}&kind=eq.image&order=created_at.asc&limit=1`,
+      )
+      if (photos[0]) context.preview = await signedMediaUrl(photos[0].storage_path)
     }
 
     if ((row.kind === 'event' || row.kind === 'reminder') && row.entity_id) {
@@ -533,7 +573,7 @@ async function handle(request: Request): Promise<Response> {
       sent,
       failed: failures.length,
       failures,
-      preview: { title: message.title, body: message.body },
+      preview: { title: message.title, body: message.body, hasImage: Boolean(message.image) },
     })
   } catch (error) {
     return json({ error: error instanceof Error ? error.message : 'push failed' }, 500)
