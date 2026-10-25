@@ -80,11 +80,12 @@ export function MemoryForm({
         <label className="label" htmlFor="memory-title">
           Name
         </label>
-        <input
+        <MentionInput
+          as="input"
           id="memory-title"
           className="field"
           value={title}
-          onChange={(event) => setTitle(event.target.value)}
+          onChange={setTitle}
           placeholder="Summer at the lake house"
           maxLength={120}
         />

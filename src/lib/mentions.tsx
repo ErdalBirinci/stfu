@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import type { ReactNode } from 'react'
+import type { ReactNode, RefObject } from 'react'
 import { createPortal } from 'react-dom'
 import { fetchMemberNames } from './api'
 import { initials } from './format'
@@ -84,8 +84,13 @@ interface Anchor {
  * The list is rendered into <body> as a fixed layer: the composer and the
  * memory form sit inside rounded cards with `overflow: hidden`, which used to
  * clip the suggestions — on a phone the list was invisible, so "@" looked
- * broken. Measuring the field keeps the list attached to it while the page
- * scrolls, and it flips above the field when the keyboard leaves no room.
+ * broken.
+ *
+ * Placement follows the *visual* viewport, not the window: when a phone
+ * keyboard opens Chrome keeps the layout viewport at full height and covers
+ * the bottom of the screen, so a list placed "below the field" landed behind
+ * the keyboard and never showed up. Measuring the visual viewport makes the
+ * list flip above the field and shrink to the space that is actually visible.
  */
 export function MentionInput({
   value,
@@ -96,6 +101,7 @@ export function MentionInput({
   className,
   autoFocus,
   id,
+  as = 'textarea',
 }: {
   value: string
   onChange: (next: string) => void
@@ -105,6 +111,7 @@ export function MentionInput({
   className?: string
   autoFocus?: boolean
   id?: string
+  as?: 'textarea' | 'input'
 }) {
   const names = useMemberNames()
   const [query, setQuery] = useState<string | null>(null)
@@ -130,26 +137,38 @@ export function MentionInput({
   useEffect(() => {
     if (!open) return
 
+    const viewport = window.visualViewport
+
     function place() {
       const rect = areaRef.current?.getBoundingClientRect()
       if (!rect) return
-      const roomBelow = window.innerHeight - rect.bottom
-      const above = roomBelow < 240 && rect.top > roomBelow
+      const visibleTop = viewport?.offsetTop ?? 0
+      const visibleBottom = visibleTop + (viewport?.height ?? window.innerHeight)
+      const roomBelow = visibleBottom - rect.bottom
+      const roomAbove = rect.top - visibleTop
+      const above = roomBelow < 220 && roomAbove > roomBelow
       const width = Math.min(rect.width, window.innerWidth - 16)
       setAnchor({
         left: Math.max(8, Math.min(rect.left, window.innerWidth - width - 8)),
         width,
+        // The layer is fixed to the layout viewport, so anchoring from the
+        // window's bottom edge puts it above the field even when the keyboard
+        // is only shrinking the visual viewport.
         ...(above ? { bottom: window.innerHeight - rect.top + 6 } : { top: rect.bottom + 6 }),
-        maxHeight: Math.max(120, Math.min(280, (above ? rect.top : roomBelow) - 16)),
+        maxHeight: Math.max(120, Math.min(280, (above ? roomAbove : roomBelow) - 16)),
       })
     }
 
     place()
     window.addEventListener('scroll', place, true)
     window.addEventListener('resize', place)
+    viewport?.addEventListener('resize', place)
+    viewport?.addEventListener('scroll', place)
     return () => {
       window.removeEventListener('scroll', place, true)
       window.removeEventListener('resize', place)
+      viewport?.removeEventListener('resize', place)
+      viewport?.removeEventListener('scroll', place)
     }
   }, [open])
 
@@ -215,23 +234,27 @@ export function MentionInput({
         )
       : null
 
+  const shared = {
+    id,
+    autoFocus,
+    value,
+    onChange: (event: { target: { value: string } }) => handleChange(event.target.value),
+    onBlur: closeSoon,
+    onFocus: () => {
+      if (closeTimer.current !== null) window.clearTimeout(closeTimer.current)
+    },
+    placeholder,
+    maxLength,
+    className,
+  }
+
   return (
     <div className="relative">
-      <textarea
-        id={id}
-        ref={areaRef}
-        autoFocus={autoFocus}
-        value={value}
-        onChange={(event) => handleChange(event.target.value)}
-        onBlur={closeSoon}
-        onFocus={() => {
-          if (closeTimer.current !== null) window.clearTimeout(closeTimer.current)
-        }}
-        placeholder={placeholder}
-        rows={rows}
-        maxLength={maxLength}
-        className={className}
-      />
+      {as === 'input' ? (
+        <input ref={areaRef as unknown as RefObject<HTMLInputElement>} {...shared} />
+      ) : (
+        <textarea ref={areaRef} rows={rows} {...shared} />
+      )}
       {menu}
     </div>
   )

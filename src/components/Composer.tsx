@@ -98,10 +98,11 @@ export function Composer({ onPosted, seed }: { onPosted: (postId: string) => voi
       <div className="flex items-start gap-3 p-4 pb-2">
         <Avatar name={profile?.display_name ?? 'Me'} path={profile?.avatar_url} size={36} />
         <div className="min-w-0 flex-1">
-          <input
+          <MentionInput
+            as="input"
             autoFocus
             value={title}
-            onChange={(event) => setTitle(event.target.value)}
+            onChange={setTitle}
             placeholder="A title for your post (optional)"
             maxLength={140}
             className="w-full border-0 bg-transparent p-0 text-[16.5px] font-semibold tracking-[-0.02em] outline-none placeholder:font-semibold placeholder:text-[#b3b3ba]"
