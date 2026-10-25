@@ -104,7 +104,7 @@ export function notificationText(notification: AppNotification): string {
     case 'post':
       return `${name} shared something new`
     case 'comment':
-      return `${name} replied on a post`
+      return notification.memory_id ? `${name} commented on a memory` : `${name} replied on a post`
     case 'reaction':
       return `${name} reacted to your post`
     case 'event':
@@ -125,6 +125,12 @@ export function notificationHref(notification: AppNotification): string {
       return notification.entity_id ? `/events/${notification.entity_id}` : '/calendar'
     case 'memory':
       return notification.entity_id ? `/memories/${notification.entity_id}` : '/memories'
+    case 'comment':
+      return notification.memory_id
+        ? `/memories/${notification.memory_id}#comments`
+        : notification.post_id
+          ? `/post/${notification.post_id}`
+          : '/'
     default:
       return notification.post_id ? `/post/${notification.post_id}` : '/'
   }

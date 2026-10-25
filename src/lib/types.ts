@@ -61,6 +61,7 @@ export interface AppNotification {
   kind: NotificationKind
   entity_id: string | null
   post_id: string | null
+  memory_id?: string | null
   body: string | null
   read_at: string | null
   created_at: string
@@ -118,6 +119,16 @@ export interface Memory {
   created_by: string
   created_at: string
   creator?: Profile | null
+  media?: MediaItem[]
+}
+
+export interface MemoryComment {
+  id: string
+  memory_id: string
+  author_id: string
+  body: string
+  created_at: string
+  author?: Profile | null
   media?: MediaItem[]
 }
 

@@ -11,6 +11,7 @@ import type {
   Member,
   MemberStatus,
   Memory,
+  MemoryComment,
   Post,
   Profile,
   ProfileOverview,
@@ -28,13 +29,16 @@ const POST_FIELDS = `id, author_id, title, body, created_at, updated_at,
   media(${MEDIA_FIELDS}),
   reactions:post_reactions(emoji, user_id),
   comments(count)`
-const NOTIFICATION_FIELDS = `id, user_id, actor_id, kind, entity_id, post_id, body, read_at, created_at,
+const NOTIFICATION_FIELDS = `id, user_id, actor_id, kind, entity_id, post_id, memory_id, body, read_at, created_at,
   actor:profiles!notifications_actor_id_fkey(id, display_name, avatar_url)`
 const EVENT_FIELDS = `id, title, description, location, starts_at, ends_at, all_day, created_by, created_at,
   creator:profiles!events_created_by_fkey(${PROFILE_FIELDS}),
   attendees:event_attendees(status, user_id, created_at, profile:profiles!event_attendees_user_id_fkey(${PROFILE_FIELDS}))`
 const MEMORY_FIELDS = `id, title, description, taken_on, created_by, created_at,
   creator:profiles!memories_created_by_fkey(${PROFILE_FIELDS}),
+  media(${MEDIA_FIELDS})`
+const MEMORY_COMMENT_FIELDS = `id, memory_id, author_id, body, created_at,
+  author:profiles!comments_author_id_fkey(${PROFILE_FIELDS}),
   media(${MEDIA_FIELDS})`
 
 async function currentUserId(): Promise<string> {
@@ -334,6 +338,58 @@ export async function deleteMemory(memoryId: string): Promise<void> {
   const { error } = await supabase.from('memories').delete().eq('id', memoryId)
   if (error) throw error
   await removeStorageObjects(paths)
+}
+
+export async function updateMemory(input: {
+  memoryId: string
+  title: string
+  description: string
+  takenOn: string | null
+}): Promise<void> {
+  const { error } = await supabase
+    .from('memories')
+    .update({
+      title: input.title.trim(),
+      description: input.description.trim() || null,
+      taken_on: input.takenOn,
+    })
+    .eq('id', input.memoryId)
+  if (error) throw error
+}
+
+/* --------------------------- memory conversations ------------------------ */
+
+export async function fetchMemoryComments(memoryId: string): Promise<MemoryComment[]> {
+  const { data, error } = await supabase
+    .from('comments')
+    .select(MEMORY_COMMENT_FIELDS)
+    .eq('memory_id', memoryId)
+    .order('created_at', { ascending: true })
+  if (error) throw error
+  const comments = (data ?? []) as unknown as MemoryComment[]
+  await hydrateMedia(comments)
+  return comments
+}
+
+export async function addMemoryComment(input: {
+  memoryId: string
+  body: string
+  files: File[]
+  onProgress?: (done: number, total: number) => void
+}): Promise<void> {
+  const authorId = await currentUserId()
+  const { data, error } = await supabase
+    .from('comments')
+    .insert({ memory_id: input.memoryId, author_id: authorId, body: input.body.trim() })
+    .select('id')
+    .single()
+  if (error) throw error
+  await uploadMediaFiles(
+    authorId,
+    input.files,
+    { comment_id: (data as { id: string }).id },
+    input.onProgress,
+  )
 }
 
 /* --------------------------------- profile ------------------------------- */

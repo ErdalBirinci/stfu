@@ -1,17 +1,125 @@
 import { useRef, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
-import { ArrowLeft, ImagePlus, Play, Trash2 } from 'lucide-react'
-import { addMemoryMedia, deleteMemory, fetchMemory } from '../lib/api'
+import { ArrowLeft, ImagePlus, MessageCircle, Pencil, Play, Send, Trash2 } from 'lucide-react'
+import { addMemoryComment, addMemoryMedia, deleteMemory, fetchMemory, fetchMemoryComments } from '../lib/api'
 import { useAuth } from '../lib/auth'
 import { fileSize, fullDate, relativeTime, shortDate } from '../lib/format'
 import { useAsyncData } from '../lib/hooks'
 import { kindOf, signedUrl } from '../lib/media'
-import type { MediaItem } from '../lib/types'
+import type { MediaItem, MemoryComment, PickedFile } from '../lib/types'
 import { Avatar } from '../components/Avatar'
 import { Lightbox } from '../components/Lightbox'
+import { MediaGrid } from '../components/MediaGrid'
+import { MediaPicker, releasePickedFiles } from '../components/MediaPicker'
+import { MemoryForm } from '../components/MemoryForm'
 import { Modal } from '../components/Modal'
 import { useToast } from '../components/Toast'
 import { ErrorNote, LoadingRows, Spinner } from '../components/Ui'
+
+function CommentBubble({ comment }: { comment: MemoryComment }) {
+  const [lightboxIndex, setLightboxIndex] = useState<number | null>(null)
+  const media = comment.media ?? []
+  const visuals = media.filter((item) => item.kind !== 'audio')
+
+  return (
+    <div className="flex gap-3">
+      <Avatar name={comment.author?.display_name ?? 'Member'} path={comment.author?.avatar_url} size={32} />
+      <div className="min-w-0 flex-1">
+        <div className="rounded-2xl rounded-tl-md border border-hair bg-[#fbfbfd] px-3.5 py-2.5">
+          <div className="flex items-baseline gap-2">
+            <p className="text-[12.5px] font-semibold">{comment.author?.display_name ?? 'Member'}</p>
+            <p className="text-[11px] text-faint">{relativeTime(comment.created_at)}</p>
+          </div>
+          {comment.body ? (
+            <p className="mt-1 whitespace-pre-line text-[13.5px] leading-relaxed text-[#3c3c41]">{comment.body}</p>
+          ) : null}
+          {media.length > 0 ? (
+            <div className="mt-2">
+              <MediaGrid
+                items={media}
+                compact
+                onOpen={(_items: MediaItem[], index: number) => setLightboxIndex(index)}
+              />
+            </div>
+          ) : null}
+        </div>
+      </div>
+
+      {lightboxIndex !== null && visuals.length > 0 ? (
+        <Lightbox
+          items={visuals}
+          index={Math.min(lightboxIndex, visuals.length - 1)}
+          onClose={() => setLightboxIndex(null)}
+          onIndexChange={setLightboxIndex}
+        />
+      ) : null}
+    </div>
+  )
+}
+
+function CommentComposer({ memoryId, onPosted }: { memoryId: string; onPosted: () => void }) {
+  const toast = useToast()
+  const [body, setBody] = useState('')
+  const [files, setFiles] = useState<PickedFile[]>([])
+  const [saving, setSaving] = useState(false)
+  const [progress, setProgress] = useState<{ done: number; total: number } | null>(null)
+
+  async function submit() {
+    if (!body.trim() && files.length === 0) {
+      toast('Write something or attach a photo first.', 'error')
+      return
+    }
+    setSaving(true)
+    try {
+      await addMemoryComment({
+        memoryId,
+        body,
+        files: files.map((item) => item.file),
+        onProgress: (done, total) => setProgress({ done, total }),
+      })
+      setBody('')
+      releasePickedFiles(files)
+      setFiles([])
+      onPosted()
+    } catch (error) {
+      toast(error instanceof Error ? error.message : 'Could not post your comment.', 'error')
+    } finally {
+      setProgress(null)
+      setSaving(false)
+    }
+  }
+
+  return (
+    <div className="card p-4">
+      <p className="mb-2 text-[12px] font-semibold text-muted">Add a comment or a photo</p>
+      <textarea
+        value={body}
+        onChange={(event) => setBody(event.target.value)}
+        placeholder="Say something about this memory…"
+        rows={2}
+        maxLength={4000}
+        className="w-full resize-none rounded-xl border border-hair bg-white px-3 py-2 text-[13.5px] leading-relaxed outline-none transition focus:border-[#c9d3e3] placeholder:text-[#a9a9b0]"
+      />
+      <div className="mt-2 border-t border-hair/70 pt-1.5">
+        <MediaPicker files={files} onChange={setFiles} label="" compact />
+      </div>
+      <div className="mt-2 flex items-center justify-between gap-2">
+        <span className="text-[11px] text-faint">
+          {files.length > 0 ? `${files.length} attachment${files.length === 1 ? '' : 's'} ready` : 'Photos, video or audio'}
+        </span>
+        <button
+          type="button"
+          className="btn btn-primary !px-3.5 !py-1.5 !text-[12.5px]"
+          onClick={() => void submit()}
+          disabled={saving}
+        >
+          {saving ? <Spinner /> : <Send className="size-3.5" />}
+          {saving ? (progress ? `Uploading ${progress.done}/${progress.total}…` : 'Posting…') : 'Post'}
+        </button>
+      </div>
+    </div>
+  )
+}
 
 export function MemoryDetailPage() {
   const { id = '' } = useParams()
@@ -22,7 +130,9 @@ export function MemoryDetailPage() {
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null)
   const [uploading, setUploading] = useState(false)
   const [confirmDelete, setConfirmDelete] = useState(false)
+  const [editing, setEditing] = useState(false)
   const { data: memory, loading, error, reload } = useAsyncData(() => fetchMemory(id), [id])
+  const thread = useAsyncData<MemoryComment[]>(() => fetchMemoryComments(id), [id])
 
   if (loading && !memory) return <LoadingRows count={1} height={220} />
   if (error) return <ErrorNote message={error} onRetry={reload} />
@@ -31,8 +141,9 @@ export function MemoryDetailPage() {
   const media = memory.media ?? []
   const visuals = media.filter((item) => item.kind !== 'audio')
   const audio = media.filter((item) => item.kind === 'audio')
-  const canDelete = profile?.id === memory.created_by || profile?.role === 'admin'
+  const canManage = profile?.id === memory.created_by || profile?.role === 'admin'
   const totalSize = media.reduce((sum, item) => sum + item.size_bytes, 0)
+  const comments = thread.data ?? []
 
   async function handleUpload(files: FileList | null) {
     if (!files || files.length === 0) return
@@ -106,7 +217,17 @@ export function MemoryDetailPage() {
             {uploading ? <Spinner className="size-3.5" /> : <ImagePlus className="size-3.5" />}
             {uploading ? 'Uploading…' : 'Add media'}
           </button>
-          {canDelete ? (
+          {canManage ? (
+            <button
+              type="button"
+              onClick={() => setEditing(true)}
+              className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1.5 text-[12px] font-medium text-muted transition hover:bg-white hover:text-ink"
+            >
+              <Pencil className="size-3.5" />
+              Edit
+            </button>
+          ) : null}
+          {canManage ? (
             <button
               type="button"
               onClick={() => setConfirmDelete(true)}
@@ -134,6 +255,10 @@ export function MemoryDetailPage() {
           <span>
             {media.length} {media.length === 1 ? 'item' : 'items'}
             {totalSize > 0 ? ` · ${fileSize(totalSize)}` : ''}
+          </span>
+          <span className="size-1 rounded-full bg-[#d8d8df]" />
+          <span>
+            {comments.length} {comments.length === 1 ? 'comment' : 'comments'}
           </span>
           {memory.creator ? (
             <>
@@ -245,6 +370,38 @@ export function MemoryDetailPage() {
         </div>
       </div>
 
+      <section id="comments" className="mt-6 space-y-3.5">
+        <h2 className="flex items-center gap-2 px-1 text-[13px] font-semibold uppercase tracking-[0.1em] text-faint">
+          <MessageCircle className="size-3.5" />
+          Conversation
+        </h2>
+
+        {thread.error ? <ErrorNote message={thread.error} onRetry={thread.reload} /> : null}
+
+        {thread.loading && !thread.data ? (
+          <div className="space-y-3">
+            {[0, 1].map((index) => (
+              <div key={index} className="flex gap-3">
+                <span className="skeleton size-8 rounded-full" />
+                <span className="skeleton h-16 flex-1 rounded-2xl" />
+              </div>
+            ))}
+          </div>
+        ) : comments.length === 0 ? (
+          <p className="card px-5 py-6 text-center text-[13px] text-muted">
+            No comments yet — be the first to say something or add a photo from that day.
+          </p>
+        ) : (
+          <div className="space-y-3.5">
+            {comments.map((comment) => (
+              <CommentBubble key={comment.id} comment={comment} />
+            ))}
+          </div>
+        )}
+
+        <CommentComposer memoryId={memory.id} onPosted={() => thread.reload()} />
+      </section>
+
       {lightboxIndex !== null && visuals.length > 0 ? (
         <Lightbox
           items={visuals}
@@ -253,6 +410,23 @@ export function MemoryDetailPage() {
           onIndexChange={setLightboxIndex}
         />
       ) : null}
+
+      <Modal
+        open={editing}
+        onClose={() => setEditing(false)}
+        title="Edit memory"
+        description="Change the name, the story or the date. The photos stay as they are."
+        width="sm:max-w-[480px]"
+      >
+        <MemoryForm
+          memory={memory}
+          onSaved={() => {
+            setEditing(false)
+            reload()
+          }}
+          onCancel={() => setEditing(false)}
+        />
+      </Modal>
 
       <Modal
         open={confirmDelete}
