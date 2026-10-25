@@ -28,7 +28,7 @@ static React build that can live on **GitHub Pages**. There is no server to run.
 | **Presence** | The sidebar lists who currently has the circle open, straight from Supabase Realtime presence — nothing is written to the database. |
 | **Installable app** | A web app manifest and service worker make the site installable on phones and desktop; installed it opens full screen and works offline for the shell. |
 | **Archive export** | **/dobby → Archive** checks the contents and packs every post, reply, memory, event and file into a zip with a manifest — the circle's data is never locked in. |
-| **Push** | Installed devices can subscribe to notifications; a database trigger hands every new notification to a Supabase Edge Function that encrypts and delivers it (aes128gcm + VAPID). |
+| **Push** | Installed devices can subscribe to notifications; a database trigger hands every new notification to a Supabase Edge Function that encrypts and delivers it (aes128gcm + VAPID). Each one says what actually happened: who replied and with what, how many photos came with a post, which post got a reaction, when a plan starts, and a mention reads as a mention instead of a generic alert. |
 | **Admin** | `/dobby` holds the request queue, the member list, admin/suspend controls and counts for the whole circle. |
 | **Design** | Light, Apple-leaning interface: system font stack, translucent bars, soft cards, quiet gradients. English copy. |
 
