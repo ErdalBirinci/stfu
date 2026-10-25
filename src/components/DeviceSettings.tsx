@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
-import { BellRing, BellOff, Download, ShieldAlert, Smartphone } from 'lucide-react'
-import { removePushSubscription, savePushSubscription } from '../lib/api'
+import { BellRing, BellOff, Download, Send, ShieldAlert, Smartphone } from 'lucide-react'
+import { removePushSubscription, savePushSubscription, sendPushSelfTest } from '../lib/api'
 import { disablePush, enablePush, pushState, pushSupported, type PushState } from '../lib/push'
 import { isIos, isStandalone } from '../lib/pwa'
 import { cn } from '../lib/cn'
@@ -22,6 +22,7 @@ export function DeviceSettings() {
   const toast = useToast()
   const [state, setState] = useState<PushState | 'loading'>('loading')
   const [busy, setBusy] = useState(false)
+  const [testing, setTesting] = useState(false)
   const installed = isStandalone()
 
   useEffect(() => {
@@ -64,6 +65,22 @@ export function DeviceSettings() {
       toast(error instanceof Error ? error.message : 'Could not turn off notifications.', 'error')
     } finally {
       setBusy(false)
+    }
+  }
+
+  async function sendTest() {
+    setTesting(true)
+    try {
+      const devices = await sendPushSelfTest()
+      if (devices === 0) {
+        toast('No device is registered yet — turn notifications on first.', 'error')
+        return
+      }
+      toast(`Test sent to ${devices} ${devices === 1 ? 'device' : 'devices'}. Watch the phone.`, 'success')
+    } catch (error) {
+      toast(error instanceof Error ? error.message : 'Could not send the test.', 'error')
+    } finally {
+      setTesting(false)
     }
   }
 
@@ -121,6 +138,24 @@ export function DeviceSettings() {
           <InstallEntry variant="card" />
         )}
       </div>
+
+      {state === 'on' ? (
+        <div className="mt-2.5 rounded-xl bg-[#f7f7fa] px-3 py-2.5">
+          <p className="text-[11.5px] leading-relaxed text-muted">
+            Keep the app open, then send one to this phone. If nothing arrives, check STFU&apos;s
+            notification permission in the phone&apos;s settings and that the ringer is not silent.
+          </p>
+          <button
+            type="button"
+            onClick={() => void sendTest()}
+            disabled={testing}
+            className="btn btn-quiet mt-2 !px-3 !py-1.5 !text-[12px]"
+          >
+            {testing ? <Spinner /> : <Send className="size-3.5" />}
+            {testing ? 'Sending…' : 'Send a test notification'}
+          </button>
+        </div>
+      ) : null}
 
       {state !== 'on' && supported && installed && isIos() ? (
         <p className="mt-2 text-[11px] leading-relaxed text-faint">

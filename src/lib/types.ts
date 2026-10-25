@@ -12,6 +12,7 @@ export type NotificationKind =
   | 'memory'
   | 'reminder'
   | 'mention'
+  | 'test'
 
 export interface Profile {
   id: string

@@ -248,6 +248,13 @@ export function describeNotification(row: NotificationRow): {
         url: row.entity_id ? `memories/${row.entity_id}` : 'memories',
         tag: row.entity_id ? `memory-${row.entity_id}` : 'memory',
       }
+    case 'test':
+      return {
+        title: 'STFU is working',
+        body: row.body ? row.body.slice(0, 120) : 'This device can receive notifications.',
+        url: 'profile',
+        tag: 'push-test',
+      }
     case 'reminder':
       return {
         title: 'Starting within a day',

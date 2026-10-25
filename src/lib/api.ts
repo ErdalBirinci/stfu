@@ -785,6 +785,12 @@ export async function removePushSubscription(endpoint: string): Promise<void> {
   if (error) throw error
 }
 
+export async function sendPushSelfTest(): Promise<number> {
+  const { data, error } = await supabase.rpc('push_self_test')
+  if (error) throw new Error(error.message)
+  return (data as number) ?? 0
+}
+
 export async function isPushRegistered(endpoint: string): Promise<boolean> {
   const { data, error } = await supabase
     .from('push_subscriptions')
