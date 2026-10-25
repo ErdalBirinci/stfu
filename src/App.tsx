@@ -1,4 +1,4 @@
-import { BrowserRouter, Navigate, Route, Routes, useLocation } from 'react-router-dom'
+import { HashRouter, Navigate, Route, Routes, useLocation } from 'react-router-dom'
 import { AppLayout } from './components/Layout'
 import { LogoMark } from './components/Logo'
 import { ToastProvider } from './components/Toast'
@@ -52,12 +52,14 @@ function LoginRoute() {
 }
 
 export function App() {
-  const basename = import.meta.env.BASE_URL.replace(/\/$/, '') || '/'
-
   if (!isConfigured) return <SetupPage />
 
   return (
-    <BrowserRouter basename={basename}>
+    // GitHub Pages has no server-side rewrites, so a real path like /post/x
+    // answered with a 404 document. Every route lives behind the hash instead,
+    // which the browser resolves inside the one document Pages does serve; the
+    // redirect in index.html sends old paths here.
+    <HashRouter>
       <AuthProvider>
         <ToastProvider>
           <RecoveryRedirect />
@@ -79,6 +81,6 @@ export function App() {
           </Routes>
         </ToastProvider>
       </AuthProvider>
-    </BrowserRouter>
+    </HashRouter>
   )
 }

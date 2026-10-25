@@ -16,6 +16,22 @@
       content="STFU is a private circle for a small group of friends: a shared timeline, an event calendar and a memory archive."
     />
     <title>STFU — the circle</title>
+    <script>
+      // Routes live behind the hash (GitHub Pages cannot rewrite paths, so a
+      // real path such as /post/<id> is answered with a 404 document). Old
+      // links, bookmarks and notifications sent before the switch are still
+      // real paths; send them to the matching hash route in a single hop.
+      ;(function () {
+        var base = '%BASE_URL%'
+        var path = window.location.pathname
+        if (path.indexOf(base) !== 0) return
+        var rest = path.slice(base.length).replace(/^\/+/, '').replace(/\/+$/, '')
+        if (rest === 'index.html' || rest === '404.html') return
+        if (rest && !window.location.hash) {
+          window.location.replace(base + '#/' + rest + window.location.search)
+        }
+      })()
+    </script>
   </head>
   <body>
     <div id="root"></div>

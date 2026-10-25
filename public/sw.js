@@ -7,6 +7,25 @@ const SHELL = ['', 'index.html', 'manifest.webmanifest', 'favicon.svg', 'icons/i
 
 const absolute = (path) => new URL(path, BASE).toString()
 
+/** Every route lives behind a hash, so any path — old or new — becomes one. */
+function hashUrl(path) {
+  let target = String(path || '')
+  try {
+    target = new URL(target, BASE).href
+  } catch {
+    target = ''
+  }
+  if (target.indexOf('#/') > -1) return target
+  if (!target.startsWith(BASE)) return `${BASE}#/`
+  const rest = target.slice(BASE.length).replace(/^\/+/, '')
+  return rest ? `${BASE}#/${rest}` : `${BASE}#/`
+}
+
+function targetFor(data) {
+  const raw = (data && data.url) || ''
+  return hashUrl(raw)
+}
+
 self.addEventListener('install', (event) => {
   self.skipWaiting()
   if (LOCAL) return
@@ -87,14 +106,14 @@ self.addEventListener('push', (event) => {
       // Chrome and Android show this as the big preview; iOS ignores it.
       image: payload.image ? new URL(payload.image, BASE).toString() : undefined,
       tag: payload.tag || 'stfu',
-      data: { url: payload.url ? new URL(payload.url, BASE).toString() : BASE },
+      data: { url: hashUrl(payload.url) },
     }),
   )
 })
 
 self.addEventListener('notificationclick', (event) => {
   event.notification.close()
-  const target = (event.notification.data && event.notification.data.url) || BASE
+  const target = targetFor(event.notification.data)
 
   event.waitUntil(
     (async () => {

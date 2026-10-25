@@ -186,7 +186,7 @@ assert.equal(shown[0].title, 'Özlem replied')
 assert.equal(shown[0].options.body, 'Merhaba')
 assert.equal(shown[0].options.tag, 'post-abc')
 assert.equal(shown[0].options.icon, `${scope}icons/icon-192.png`)
-assert.equal(shown[0].options.data.url, `${scope}post/abc`, 'relative url resolves inside the app')
+assert.equal(shown[0].options.data.url, `${scope}#/post/abc`, 'a legacy path becomes a hash route')
 assert.equal(
   shown[0].options.image,
   'https://stiwuvmnxqwmhftkbcas.supabase.co/storage/v1/object/sign/media/u/image/a.jpg?token=t',
@@ -202,7 +202,7 @@ listeners.notificationclick[0]({
   waitUntil: (promise) => clicks.push(promise),
 })
 await Promise.all(clicks)
-assert.equal(navigated[0], `${scope}post/abc`, 'tapping focuses the open app on that post')
+assert.equal(navigated[0], `${scope}#/post/abc`, 'tapping focuses the open app on that post')
 assert.equal(opened.length, 0, 'an open window is reused instead of a new one')
 
 /* ------------------------------------------------------------ 4. copy */
