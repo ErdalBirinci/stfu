@@ -188,8 +188,8 @@ export function ProfilePage() {
         </div>
 
         <div className="px-5 pb-1">
-          <div className="-mt-9 flex flex-wrap items-end gap-3">
-            <div className="relative">
+          <div className="relative z-10 -mt-9 flex flex-wrap items-end gap-3">
+            <div className="relative shrink-0">
               {preview ? (
                 <img
                   src={preview}
