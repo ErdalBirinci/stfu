@@ -55,6 +55,19 @@ export async function pushState(): Promise<PushState> {
   return (await currentSubscription()) ? 'on' : 'off'
 }
 
+/** The three strings the server needs, whether or not toJSON() gives the keys. */
+export function subscriptionPayload(subscription: PushSubscription): {
+  endpoint: string
+  p256dh: string
+  auth: string
+} {
+  const json = subscription.toJSON()
+  const p256dh = json.keys?.p256dh ?? encodeKey(subscription.getKey('p256dh'))
+  const auth = json.keys?.auth ?? encodeKey(subscription.getKey('auth'))
+  if (!p256dh || !auth) throw new Error('This browser returned an incomplete subscription.')
+  return { endpoint: subscription.endpoint, p256dh, auth }
+}
+
 /** Asks the browser for permission, subscribes and hands the keys to the app. */
 export async function enablePush(save: (payload: {
   endpoint: string
@@ -77,12 +90,9 @@ export async function enablePush(save: (payload: {
       applicationServerKey: decodeKey(VAPID_PUBLIC_KEY),
     }))
 
-  const json = subscription.toJSON()
-  const p256dh = json.keys?.p256dh ?? encodeKey(subscription.getKey('p256dh'))
-  const auth = json.keys?.auth ?? encodeKey(subscription.getKey('auth'))
-  if (!p256dh || !auth) throw new Error('This browser returned an incomplete subscription.')
+  const keys = subscriptionPayload(subscription)
 
-  await save({ endpoint: subscription.endpoint, p256dh, auth }, navigator.userAgent)
+  await save(keys, navigator.userAgent)
   return 'on'
 }
 

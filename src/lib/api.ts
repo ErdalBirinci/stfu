@@ -765,19 +765,15 @@ export async function savePushSubscription(
   subscription: PushSubscriptionRow,
   userAgent: string,
 ): Promise<void> {
-  const userId = await currentUserId()
-  const { error } = await supabase.from('push_subscriptions').upsert(
-    {
-      user_id: userId,
-      endpoint: subscription.endpoint,
-      p256dh: subscription.p256dh,
-      auth: subscription.auth,
-      user_agent: userAgent.slice(0, 200),
-      failed_at: null,
-    },
-    { onConflict: 'endpoint' },
-  )
-  if (error) throw error
+  // The definer function re-owns a device that was registered under another
+  // account, which a client-side upsert cannot do under row level security.
+  const { error } = await supabase.rpc('claim_push_subscription', {
+    p_endpoint: subscription.endpoint,
+    p_p256dh: subscription.p256dh,
+    p_auth: subscription.auth,
+    p_user_agent: userAgent.slice(0, 200),
+  })
+  if (error) throw new Error(error.message)
 }
 
 export async function removePushSubscription(endpoint: string): Promise<void> {

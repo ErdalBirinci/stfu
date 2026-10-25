@@ -1,7 +1,20 @@
 import { useEffect, useState } from 'react'
 import { BellRing, BellOff, Download, Send, ShieldAlert, Smartphone } from 'lucide-react'
-import { removePushSubscription, savePushSubscription, sendPushSelfTest } from '../lib/api'
-import { disablePush, enablePush, pushState, pushSupported, type PushState } from '../lib/push'
+import {
+  isPushRegistered,
+  removePushSubscription,
+  savePushSubscription,
+  sendPushSelfTest,
+} from '../lib/api'
+import {
+  currentSubscription,
+  disablePush,
+  enablePush,
+  pushState,
+  pushSupported,
+  subscriptionPayload,
+  type PushState,
+} from '../lib/push'
 import { isIos, isStandalone } from '../lib/pwa'
 import { cn } from '../lib/cn'
 import { InstallEntry } from './InstallPrompt'
@@ -23,17 +36,48 @@ export function DeviceSettings() {
   const [state, setState] = useState<PushState | 'loading'>('loading')
   const [busy, setBusy] = useState(false)
   const [testing, setTesting] = useState(false)
+  const [syncing, setSyncing] = useState(false)
+  const [deviceId, setDeviceId] = useState('')
+  const [problem, setProblem] = useState('')
   const installed = isStandalone()
 
   useEffect(() => {
     let alive = true
-    void pushState()
-      .then((next) => {
-        if (alive) setState(next)
-      })
-      .catch(() => {
-        if (alive) setState('unsupported')
-      })
+
+    // A browser keeps its push subscription across sign-outs, so a phone can
+    // read "on" while the database holds no device for this account — a save
+    // that failed, or a different account that enabled notifications first.
+    // Re-claim the device quietly instead of leaving the two out of step.
+    async function reconcile() {
+      const next = await pushState()
+      if (!alive) return
+      setState(next)
+      if (next !== 'on') return
+
+      const subscription = await currentSubscription()
+      if (!subscription || !alive) return
+      setDeviceId(subscription.endpoint.slice(-6))
+      if (await isPushRegistered(subscription.endpoint)) return
+      if (!alive) return
+
+      setSyncing(true)
+      try {
+        await savePushSubscription(subscriptionPayload(subscription), navigator.userAgent)
+        if (alive) setProblem('')
+      } catch (error) {
+        if (alive)
+          setProblem(error instanceof Error ? error.message : 'Could not register this device.')
+      } finally {
+        if (alive) setSyncing(false)
+      }
+    }
+
+    void reconcile().catch((error) => {
+      if (!alive) return
+      setState('unsupported')
+      setProblem(error instanceof Error ? error.message : '')
+    })
+
     return () => {
       alive = false
     }
@@ -44,7 +88,12 @@ export function DeviceSettings() {
     try {
       const next = await enablePush(savePushSubscription)
       setState(next)
-      if (next === 'on') toast('Notifications are on for this device.', 'success')
+      if (next === 'on') {
+        const subscription = await currentSubscription()
+        setDeviceId(subscription ? subscription.endpoint.slice(-6) : '')
+        setProblem('')
+        toast('Notifications are on for this device.', 'success')
+      }
       else if (next === 'blocked')
         toast('Your browser blocked notifications. Allow them in the site settings.', 'error')
       else toast('Permission was dismissed — nothing changed.', 'error')
@@ -106,8 +155,14 @@ export function DeviceSettings() {
         ) : (
           <BellOff className="mt-0.5 size-3.5 shrink-0" />
         )}
-        {statusLine(state, installed)}
+        {syncing ? 'On — registering this device with the circle…' : statusLine(state, installed)}
       </p>
+
+      {problem ? (
+        <p className="mt-2 rounded-xl bg-[#fdf1f1] px-3 py-2.5 text-[11.5px] leading-relaxed text-[#a33]">
+          This device is not saved on the server yet: {problem}
+        </p>
+      ) : null}
 
       <div className="mt-3 flex flex-wrap items-center gap-2">
         {supported ? (
@@ -148,12 +203,15 @@ export function DeviceSettings() {
           <button
             type="button"
             onClick={() => void sendTest()}
-            disabled={testing}
+            disabled={testing || syncing}
             className="btn btn-quiet mt-2 !px-3 !py-1.5 !text-[12px]"
           >
             {testing ? <Spinner /> : <Send className="size-3.5" />}
             {testing ? 'Sending…' : 'Send a test notification'}
           </button>
+          {deviceId ? (
+            <p className="mt-2 text-[11px] tabular-nums text-faint">Device …{deviceId}</p>
+          ) : null}
         </div>
       ) : null}
 
