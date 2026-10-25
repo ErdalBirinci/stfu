@@ -196,74 +196,154 @@ interface NotificationRow {
   actor: { display_name: string } | null
 }
 
-export function describeNotification(row: NotificationRow): {
+export interface MediaSummary {
+  images: number
+  videos: number
+  audios: number
+}
+
+export interface PushContext {
+  media?: MediaSummary | null
+  postTitle?: string | null
+  event?: { title: string; starts_at: string; location: string | null } | null
+}
+
+const clip = (value: string | null | undefined, max = 110): string => {
+  const clean = (value ?? '').replace(/\s+/g, ' ').trim()
+  return clean.length > max ? `${clean.slice(0, max - 1).trimEnd()}…` : clean
+}
+
+function mediaPhrase(media?: MediaSummary | null): string {
+  if (!media) return ''
+  const parts: string[] = []
+  if (media.images) parts.push(`${media.images} ${media.images === 1 ? 'photo' : 'photos'}`)
+  if (media.videos) parts.push(`${media.videos} ${media.videos === 1 ? 'video' : 'videos'}`)
+  if (media.audios) parts.push(`${media.audios} ${media.audios === 1 ? 'voice note' : 'voice notes'}`)
+  if (parts.length <= 1) return parts[0] ?? ''
+  return `${parts.slice(0, -1).join(', ')} and ${parts[parts.length - 1]}`
+}
+
+/** "text · 2 photos" — the detail line under a notification title. */
+function detail(text: string, media?: MediaSummary | null): string {
+  return [text, mediaPhrase(media)].filter(Boolean).join(' · ')
+}
+
+/** Timezone-free countdown, so the same text reads right everywhere. */
+function startsIn(iso: string): string {
+  const starts = new Date(iso).getTime()
+  if (!Number.isFinite(starts)) return ''
+  const minutes = Math.round((starts - Date.now()) / 60000)
+  if (minutes < 0) return 'already started'
+  if (minutes < 60) return `starts in ${Math.max(minutes, 1)} min`
+  const hours = Math.round(minutes / 60)
+  if (hours < 24) return `starts in ${hours} ${hours === 1 ? 'hour' : 'hours'}`
+  const days = Math.round(hours / 24)
+  if (days === 1) return 'starts tomorrow'
+  return `starts in ${days} days`
+}
+
+export function describeNotification(
+  row: NotificationRow,
+  context: PushContext = {},
+): {
   title: string
   body: string
   url: string
   tag: string
 } {
   const name = row.actor?.display_name ?? 'Someone'
-  const quoted = row.body ? `“${row.body.slice(0, 90)}”` : ''
+  const text = clip(row.body, 140)
 
   switch (row.kind) {
     case 'post':
       return {
-        title: `${name} posted in STFU`,
-        body: row.body ? row.body.slice(0, 120) : 'Something new in the circle.',
+        title: `${name} posted`,
+        body: detail(text ? `“${clip(text, 90)}”` : '', context.media) || 'A new post in the circle.',
         url: row.post_id ? `post/${row.post_id}` : '',
         tag: row.post_id ? `post-${row.post_id}` : 'post',
       }
-    case 'comment':
+    case 'comment': {
+      const line = detail(text ? (row.memory_id ? `“${clip(text, 90)}”` : text) : '', context.media)
       return row.memory_id
         ? {
             title: `${name} commented on a memory`,
-            body: row.body ? row.body.slice(0, 120) : 'A memory got a reply.',
+            body: line || 'A memory got a reply.',
             url: `memories/${row.memory_id}#comments`,
             tag: `memory-${row.memory_id}`,
           }
         : {
             title: `${name} replied`,
-            body: row.body ? row.body.slice(0, 120) : 'Your post has a new reply.',
+            body: line || 'Your post has a new reply.',
             url: row.post_id ? `post/${row.post_id}` : '',
             tag: row.post_id ? `post-${row.post_id}` : 'comment',
           }
-    case 'reaction':
+    }
+    case 'mention':
       return {
-        title: `${name} reacted to your post`,
-        body: row.body ? `A ${row.body} on your post.` : 'Someone liked what you shared.',
+        title: `${name} mentioned you`,
+        body:
+          detail(text ? `“${clip(text, 90)}”` : '', context.media) || 'You were mentioned in the circle.',
+        url: row.memory_id
+          ? `memories/${row.memory_id}#comments`
+          : row.post_id
+            ? `post/${row.post_id}`
+            : '',
+        tag: row.post_id ? `post-${row.post_id}` : 'mention',
+      }
+    case 'reaction': {
+      const emoji = clip(row.body, 6)
+      return {
+        title: emoji ? `${name} reacted ${emoji}` : `${name} reacted to your post`,
+        body: context.postTitle ? `on “${clip(context.postTitle, 70)}”` : 'on your post',
         url: row.post_id ? `post/${row.post_id}` : '',
         tag: row.post_id ? `post-${row.post_id}` : 'reaction',
       }
-    case 'event':
+    }
+    case 'event': {
+      const title = clip(context.event?.title ?? row.body, 70)
+      const when = context.event ? startsIn(context.event.starts_at) : ''
+      const place = clip(context.event?.location, 50)
       return {
-        title: 'New plan in the circle',
-        body: quoted ? `${name} planned ${quoted}` : `${name} planned an event.`,
+        title: title ? `${name} planned “${title}”` : `${name} planned an event`,
+        body: [when, place].filter(Boolean).join(' · ') || 'Open the calendar for the details.',
         url: row.entity_id ? `events/${row.entity_id}` : 'calendar',
         tag: row.entity_id ? `event-${row.entity_id}` : 'event',
       }
-    case 'memory':
+    }
+    case 'memory': {
+      const title = clip(row.body, 70)
       return {
-        title: 'A new memory',
-        body: quoted ? `${name} added ${quoted}` : `${name} added a memory.`,
+        title: `${name} added a memory`,
+        body: detail(title ? `“${title}”` : '', context.media) || 'A new memory in the archive.',
         url: row.entity_id ? `memories/${row.entity_id}` : 'memories',
         tag: row.entity_id ? `memory-${row.entity_id}` : 'memory',
       }
+    }
     case 'test':
       return {
         title: 'STFU is working',
-        body: row.body ? row.body.slice(0, 120) : 'This device can receive notifications.',
+        body: text || 'This device can receive notifications.',
         url: 'profile',
         tag: 'push-test',
       }
-    case 'reminder':
+    case 'reminder': {
+      const title = clip(context.event?.title ?? row.body, 70)
+      const when = context.event ? startsIn(context.event.starts_at) : ''
+      const place = clip(context.event?.location, 50)
       return {
-        title: 'Starting within a day',
-        body: row.body ? `${row.body} — it starts soon.` : 'An event starts soon.',
+        title: title ? `“${title}” ${when || 'starts soon'}` : 'An event starts soon',
+        body: place || 'Open the calendar to see who is going.',
         url: row.entity_id ? `events/${row.entity_id}` : 'calendar',
         tag: row.entity_id ? `reminder-${row.entity_id}` : 'reminder',
       }
+    }
     default:
-      return { title: 'STFU', body: 'Something new in the circle.', url: '', tag: 'stfu' }
+      return {
+        title: `${name} posted`,
+        body: detail(text ? `“${clip(text, 90)}”` : '', context.media) || 'Something new in the circle.',
+        url: row.post_id ? `post/${row.post_id}` : '',
+        tag: 'stfu',
+      }
   }
 }
 
@@ -325,6 +405,59 @@ async function deleteSubscription(id: string): Promise<void> {
   })
 }
 
+async function restRows<T>(path: string): Promise<T[]> {
+  const response = await fetch(`${SUPABASE_URL}/rest/v1/${path}`, { headers: restHeaders() })
+  if (!response.ok) return []
+  return (await response.json()) as T[]
+}
+
+/**
+ * The extra wording a notification needs: how many photos came with it, what
+ * the reacted-to post was called, when the planned event actually starts.
+ * Every lookup is best-effort — a detail may be missing, the push may not.
+ */
+async function buildContext(row: NotificationRow): Promise<PushContext> {
+  const context: PushContext = {}
+
+  try {
+    if (['post', 'comment', 'memory', 'mention'].includes(row.kind)) {
+      const parent =
+        row.kind === 'memory'
+          ? row.entity_id && `memory_id=eq.${row.entity_id}`
+          : row.kind === 'comment'
+            ? row.entity_id && `comment_id=eq.${row.entity_id}`
+            : (row.post_id ?? row.entity_id) && `post_id=eq.${row.post_id ?? row.entity_id}`
+
+      if (parent) {
+        const media = await restRows<{ kind: string }>(`media?select=kind&${parent}`)
+        if (media.length) {
+          context.media = {
+            images: media.filter((item) => item.kind === 'image').length,
+            videos: media.filter((item) => item.kind === 'video').length,
+            audios: media.filter((item) => item.kind === 'audio').length,
+          }
+        }
+      }
+    }
+
+    if (row.kind === 'reaction' && row.post_id) {
+      const posts = await restRows<{ title: string }>(`posts?select=title&id=eq.${row.post_id}`)
+      context.postTitle = posts[0]?.title ?? null
+    }
+
+    if ((row.kind === 'event' || row.kind === 'reminder') && row.entity_id) {
+      const events = await restRows<{ title: string; starts_at: string; location: string | null }>(
+        `events?select=title,starts_at,location&id=eq.${row.entity_id}`,
+      )
+      context.event = events[0] ?? null
+    }
+  } catch {
+    // Detail is a bonus; a lookup failure must never block the notification.
+  }
+
+  return context
+}
+
 /* ---------------------------------------------------------------- handler */
 
 async function handle(request: Request): Promise<Response> {
@@ -349,7 +482,8 @@ async function handle(request: Request): Promise<Response> {
     const devices = await getSubscriptions(notification.user_id)
     if (devices.length === 0) return json({ ok: true, sent: 0, note: 'no devices' })
 
-    const payload = JSON.stringify(describeNotification(notification))
+    const message = describeNotification(notification, await buildContext(notification))
+    const payload = JSON.stringify(message)
 
     let sent = 0
     const failures: string[] = []
@@ -394,7 +528,13 @@ async function handle(request: Request): Promise<Response> {
       }
     }
 
-    return json({ ok: true, sent, failed: failures.length, failures })
+    return json({
+      ok: true,
+      sent,
+      failed: failures.length,
+      failures,
+      preview: { title: message.title, body: message.body },
+    })
   } catch (error) {
     return json({ error: error instanceof Error ? error.message : 'push failed' }, 500)
   }

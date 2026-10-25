@@ -221,4 +221,55 @@ const memory = describeNotification({
 })
 assert.equal(memory.url, 'memories/m1#comments')
 
+const withPhotos = describeNotification(
+  {
+    id: '3',
+    user_id: 'u',
+    kind: 'post',
+    entity_id: 'p2',
+    post_id: 'p2',
+    memory_id: null,
+    body: 'Boat day',
+    actor: { display_name: 'Juulia' },
+  },
+  { media: { images: 2, videos: 1, audios: 0 } },
+)
+assert.equal(withPhotos.title, 'Juulia posted')
+assert.equal(withPhotos.body, '“Boat day” · 2 photos and 1 video')
+
+const mention = describeNotification({
+  id: '4',
+  user_id: 'u',
+  kind: 'mention',
+  entity_id: 'c4',
+  post_id: 'p4',
+  memory_id: null,
+  body: 'hey @Dobby look at this',
+  actor: { display_name: 'Özlem' },
+})
+assert.equal(mention.title, 'Özlem mentioned you')
+assert.equal(mention.body, '“hey @Dobby look at this”')
+
+const planned = describeNotification(
+  {
+    id: '5',
+    user_id: 'u',
+    kind: 'event',
+    entity_id: 'e1',
+    post_id: null,
+    memory_id: null,
+    body: 'Dinner',
+    actor: { display_name: 'Dobby' },
+  },
+  {
+    event: {
+      title: 'Dinner',
+      starts_at: new Date(Date.now() + 3 * 3600_000).toISOString(),
+      location: 'Kadıköy',
+    },
+  },
+)
+assert.equal(planned.title, 'Dobby planned “Dinner”')
+assert.equal(planned.body, 'starts in 3 hours · Kadıköy')
+
 console.log('push self-test: all assertions passed')
