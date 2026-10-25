@@ -3,6 +3,7 @@ export type MemberStatus = 'pending' | 'approved' | 'rejected' | 'suspended'
 export type MediaKind = 'image' | 'video' | 'audio'
 export type RsvpStatus = 'going' | 'maybe' | 'declined'
 export type ReactionEmoji = 'heart' | 'shush' | 'laugh' | 'fire'
+export type CategoryAccent = 'blue' | 'violet' | 'green' | 'amber' | 'rose' | 'slate'
 export type NotificationKind = 'comment' | 'reaction' | 'post' | 'event' | 'memory' | 'reminder'
 
 export interface Profile {
@@ -41,17 +42,35 @@ export interface PostReaction {
   user_id: string
 }
 
+export interface Category {
+  id: string
+  name: string
+  slug: string
+  accent: CategoryAccent
+  position: number
+  created_at: string
+  posts?: { count: number }[]
+}
+
 export interface Post {
   id: string
   author_id: string
   title: string
   body: string
+  category_id: string | null
   created_at: string
   updated_at: string
   author?: Profile | null
+  category?: Pick<Category, 'id' | 'name' | 'slug' | 'accent'> | null
   media?: MediaItem[]
   reactions?: PostReaction[]
   comments?: { count: number }[]
+}
+
+export interface OnlineMember {
+  id: string
+  display_name: string
+  avatar_url: string | null
 }
 
 export interface AppNotification {

@@ -31,11 +31,12 @@ import { fileSize, relativeTime, shortDate } from '../lib/format'
 import { useAsyncData } from '../lib/hooks'
 import type { AdminStats, AdminStorage, AuditEntry, Member } from '../lib/types'
 import { Avatar } from '../components/Avatar'
+import { AdminLabels } from '../components/AdminLabels'
 import { useToast } from '../components/Toast'
 import { EmptyState, ErrorNote, PageHeader, Spinner } from '../components/Ui'
 import { NotFoundPage } from './NotFound'
 
-type Tab = 'requests' | 'members' | 'activity'
+type Tab = 'requests' | 'members' | 'activity' | 'labels'
 
 const STORAGE_LIMIT = 1024 * 1024 * 1024
 
@@ -307,6 +308,9 @@ export function AdminPage() {
           <button type="button" data-active={tab === 'activity'} onClick={() => setTab('activity')}>
             Activity
           </button>
+          <button type="button" data-active={tab === 'labels'} onClick={() => setTab('labels')}>
+            Labels
+          </button>
         </div>
 
         <div className="flex items-center gap-2">
@@ -321,7 +325,7 @@ export function AdminPage() {
               Approve all
             </button>
           ) : null}
-          {tab === 'activity' ? null : (
+          {tab === 'requests' || tab === 'members' ? (
             <label className="relative">
               <Search className="pointer-events-none absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-faint" />
               <input
@@ -332,11 +336,15 @@ export function AdminPage() {
                 className="field !w-[190px] !py-1.5 !pl-8 !text-[12.5px]"
               />
             </label>
-          )}
+          ) : null}
         </div>
       </div>
 
-      {tab === 'activity' ? (
+      {tab === 'labels' ? (
+        <div className="mt-3">
+          <AdminLabels />
+        </div>
+      ) : tab === 'activity' ? (
         <section className="card mt-3 overflow-hidden">
           {audit.error ? (
             <div className="p-4">

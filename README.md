@@ -17,6 +17,10 @@ static React build that can live on **GitHub Pages**. There is no server to run.
 | **Calendar** | A month view of everything the circle has planned. Any approved member can open an event; everyone else answers **Going / Maybe / Can't go** and sees who else is in. |
 | **Memories** | Albums for trips, birthdays and ordinary evenings. Any approved member can add photos, clips or voice notes to an album, and open anything in a fullscreen viewer. |
 | **Closed membership** | Sign-up only creates an account request. Until an admin approves it, the database refuses to return a single row of content — the waiting room is part of the data model, not just a screen. |
+| **Labels** | The admin files posts under coloured labels from **/dobby → Labels**; members filter the timeline by clicking one in the sidebar. Authors can edit their words but only an admin can label a post. |
+| **Presence** | The sidebar lists who currently has the circle open, straight from Supabase Realtime presence — nothing is written to the database. |
+| **Installable app** | A web app manifest and service worker make the site installable on phones and desktop; installed it opens full screen and works offline for the shell. |
+| **Push** | Installed devices can subscribe to notifications; a database trigger hands every new notification to a Supabase Edge Function that encrypts and delivers it (aes128gcm + VAPID). |
 | **Admin** | `/dobby` holds the request queue, the member list, admin/suspend controls and counts for the whole circle. |
 | **Design** | Light, Apple-leaning interface: system font stack, translucent bars, soft cards, quiet gradients. English copy. |
 
@@ -54,6 +58,9 @@ That single script creates:
 - `admin_members()` for the admin dashboard and `make_admin(email)` for manual bootstrapping
 
 The script is idempotent — running it again is safe.
+
+Later phases add more files: run `0002`–`0006` the same way, in order. `0006_phase3.sql` is what
+creates labels, the presence policies and the push tables.
 
 ### 3. Configure auth
 
@@ -105,6 +112,46 @@ project is never stuck waiting for an approver.
   ```
 
 ---
+
+### 7. Turn on push notifications
+
+Push needs one Edge Function and four secrets, all on the free plan.
+
+1. **Create the function.** Edge Functions → *Deploy a new function* → *Via Editor*, name it `push`,
+   paste [`supabase/functions/push/index.ts`](supabase/functions/push/index.ts) as `index.ts`, deploy.
+   In the function's **Settings**, turn *Verify JWT* **off** — the function authenticates the database
+   with its own shared secret instead.
+2. **Add secrets** (Edge Functions → Secrets):
+
+   | Secret | Value |
+   | --- | --- |
+   | `PUSH_WEBHOOK_SECRET` | any long random string |
+   | `VAPID_PUBLIC_KEY` | the URL-safe public key below |
+   | `VAPID_PRIVATE_JWK` | the matching private JWK JSON |
+   | `PUSH_SUBJECT` | `mailto:` address for push-service operators |
+
+   Generate a pair once with:
+
+   ```bash
+   node -e "crypto.subtle.generateKey({name:'ECDSA',namedCurve:'P-256'},true,['sign','verify']).then(async k=>{const j=await crypto.subtle.exportKey('jwk',k.privateKey);const p=Buffer.concat([Buffer.from([4]),Buffer.from(j.x,'base64url'),Buffer.from(j.y,'base64url')]).toString('base64url');console.log('PUBLIC',p);console.log('JWK',JSON.stringify(j))})"
+   ```
+
+   The **public** key also lives in [`src/lib/push.ts`](src/lib/push.ts) — update it there and rebuild
+   whenever you rotate the pair. It is public by design; the private half must stay in Supabase.
+3. **Point the trigger at the function.** In the SQL editor, once:
+
+   ```sql
+   insert into public.push_dispatch_config (id, function_url, shared_secret)
+   values (true, 'https://<project-ref>.supabase.co/functions/v1/push', '<PUSH_WEBHOOK_SECRET>')
+   on conflict (id) do update
+     set function_url = excluded.function_url, shared_secret = excluded.shared_secret;
+   ```
+
+   Every `notifications` insert now makes one `net.http_post` call. Without that row the trigger is a
+   no-op, so the site works fine before push is configured.
+
+Members then open **Me → App & notifications → Turn on notifications** (on iPhone this only appears
+once the app has been added to the home screen; iOS does not deliver push to browser tabs).
 
 ## Deploy to GitHub Pages
 
@@ -160,10 +207,17 @@ src/
   components/    layout, composer, media picker/grid/lightbox, modal, toasts, UI primitives
   lib/           supabase client, typed data access, auth context, formatting, signed URLs
   pages/         timeline, post thread, calendar, event, memories, album, profile, admin, login
+public/
+  manifest.webmanifest  PWA metadata
+  sw.js                 service worker: offline shell, push handler
+  icons/                generated app icons
 supabase/
-  migrations/0001_init.sql
+  migrations/           schema, in order (0001 … 0006)
+  functions/push/       Edge Function that delivers notifications
 .github/workflows/deploy.yml
-scripts/postbuild.mjs
+scripts/postbuild.mjs   copies index.html to 404.html for deep links
+scripts/make-icons.mjs  regenerates public/icons
+scripts/push-self-test.mjs  checks the push crypto and service worker logic
 ```
 
 ## Scripts
@@ -174,3 +228,5 @@ scripts/postbuild.mjs
 | `npm run build` | Typecheck, build to `dist/`, write the SPA fallback |
 | `npm run typecheck` | TypeScript only |
 | `npm run preview` | Serve the production build |
+| `npm run icons` | Regenerate the PWA icons from the inline SVG |
+| `npm run test:push` | Push encryption, VAPID signing and service-worker assertions |

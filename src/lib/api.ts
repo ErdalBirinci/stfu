@@ -5,6 +5,8 @@ import type {
   AdminStorage,
   AppNotification,
   AuditEntry,
+  Category,
+  CategoryAccent,
   CircleEvent,
   Comment,
   MediaItem,
@@ -24,8 +26,17 @@ import type {
 const PROFILE_FIELDS = 'id, display_name, avatar_url, cover_url, bio, role, status, created_at, approved_at'
 const MEDIA_FIELDS =
   'id, owner_id, kind, storage_path, file_name, mime_type, size_bytes, post_id, comment_id, memory_id, created_at'
-const POST_FIELDS = `id, author_id, title, body, created_at, updated_at,
+const CATEGORY_FIELDS = 'id, name, slug, accent, position, created_at'
+const POST_CATEGORY = `category:categories!posts_category_id_fkey(${CATEGORY_FIELDS})`
+const POST_FIELDS = `id, author_id, title, body, category_id, created_at, updated_at,
   author:profiles!posts_author_id_fkey(${PROFILE_FIELDS}),
+  ${POST_CATEGORY},
+  media(${MEDIA_FIELDS}),
+  reactions:post_reactions(emoji, user_id),
+  comments(count)`
+const POST_FIELDS_IN_CATEGORY = `id, author_id, title, body, category_id, created_at, updated_at,
+  author:profiles!posts_author_id_fkey(${PROFILE_FIELDS}),
+  category:categories!posts_category_id_fkey!inner(${CATEGORY_FIELDS}),
   media(${MEDIA_FIELDS}),
   reactions:post_reactions(emoji, user_id),
   comments(count)`
@@ -63,12 +74,14 @@ export function commentCount(post: Post): number {
 
 /* ---------------------------------- feed --------------------------------- */
 
-export async function fetchFeed(limit = 40): Promise<Post[]> {
-  const { data, error } = await supabase
+export async function fetchFeed(limit = 40, categorySlug?: string): Promise<Post[]> {
+  let query = supabase
     .from('posts')
-    .select(POST_FIELDS)
+    .select(categorySlug ? POST_FIELDS_IN_CATEGORY : POST_FIELDS)
     .order('created_at', { ascending: false })
     .limit(limit)
+  if (categorySlug) query = query.eq('category.slug', categorySlug)
+  const { data, error } = await query
   if (error) throw error
   const posts = (data ?? []) as unknown as Post[]
   await hydrateMedia(posts)
@@ -120,6 +133,69 @@ export async function deletePost(postId: string): Promise<void> {
   const { error } = await supabase.from('posts').delete().eq('id', postId)
   if (error) throw error
   await removeStorageObjects(paths)
+}
+
+/* ------------------------------- categories ------------------------------ */
+
+export async function fetchCategories(): Promise<Category[]> {
+  const { data, error } = await supabase
+    .from('categories')
+    .select(`${CATEGORY_FIELDS}, posts(count)`)
+    .order('position', { ascending: true })
+    .order('name', { ascending: true })
+  if (error) throw error
+  return (data ?? []) as unknown as Category[]
+}
+
+function categoryError(message: string): Error {
+  if (/duplicate key/i.test(message)) return new Error('A label with that name already exists.')
+  if (/Only an admin/i.test(message)) return new Error('Only an admin can label posts.')
+  return new Error(message)
+}
+
+export async function createCategory(input: {
+  name: string
+  accent: CategoryAccent
+}): Promise<Category> {
+  const { data, error } = await supabase
+    .from('categories')
+    .insert({ name: input.name.trim(), accent: input.accent })
+    .select(CATEGORY_FIELDS)
+    .single()
+  if (error) throw categoryError(error.message)
+  return data as unknown as Category
+}
+
+export async function updateCategory(
+  id: string,
+  patch: { name?: string; accent?: CategoryAccent },
+): Promise<void> {
+  const { error } = await supabase.from('categories').update(patch).eq('id', id)
+  if (error) throw categoryError(error.message)
+}
+
+export async function deleteCategory(id: string): Promise<void> {
+  const { error } = await supabase.from('categories').delete().eq('id', id)
+  if (error) throw error
+}
+
+export async function setPostCategory(postId: string, categoryId: string | null): Promise<void> {
+  const { error } = await supabase.from('posts').update({ category_id: categoryId }).eq('id', postId)
+  if (error) throw categoryError(error.message)
+}
+
+export async function fetchLabelablePosts(limit = 60): Promise<Post[]> {
+  const { data, error } = await supabase
+    .from('posts')
+    .select(
+      `id, author_id, title, body, category_id, created_at, updated_at,
+       author:profiles!posts_author_id_fkey(id, display_name),
+       ${POST_CATEGORY}`,
+    )
+    .order('created_at', { ascending: false })
+    .limit(limit)
+  if (error) throw error
+  return (data ?? []) as unknown as Post[]
 }
 
 /* -------------------------------- reactions ------------------------------ */
@@ -528,4 +604,46 @@ export async function fetchAdminStats(): Promise<AdminStats> {
     countOf('memories'),
   ])
   return { members, pending, posts, events, memories }
+}
+
+/* ------------------------------ push devices ----------------------------- */
+
+interface PushSubscriptionRow {
+  endpoint: string
+  p256dh: string
+  auth: string
+}
+
+export async function savePushSubscription(
+  subscription: PushSubscriptionRow,
+  userAgent: string,
+): Promise<void> {
+  const userId = await currentUserId()
+  const { error } = await supabase.from('push_subscriptions').upsert(
+    {
+      user_id: userId,
+      endpoint: subscription.endpoint,
+      p256dh: subscription.p256dh,
+      auth: subscription.auth,
+      user_agent: userAgent.slice(0, 200),
+      failed_at: null,
+    },
+    { onConflict: 'endpoint' },
+  )
+  if (error) throw error
+}
+
+export async function removePushSubscription(endpoint: string): Promise<void> {
+  const { error } = await supabase.from('push_subscriptions').delete().eq('endpoint', endpoint)
+  if (error) throw error
+}
+
+export async function isPushRegistered(endpoint: string): Promise<boolean> {
+  const { data, error } = await supabase
+    .from('push_subscriptions')
+    .select('id')
+    .eq('endpoint', endpoint)
+    .maybeSingle()
+  if (error) throw error
+  return Boolean(data)
 }

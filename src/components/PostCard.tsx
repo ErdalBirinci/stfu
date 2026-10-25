@@ -3,6 +3,8 @@ import { Link, useNavigate } from 'react-router-dom'
 import { MessageCircle, MoreHorizontal, Trash2 } from 'lucide-react'
 import { commentCount, deletePost } from '../lib/api'
 import { useAuth } from '../lib/auth'
+import { accent } from '../lib/categories'
+import { cn } from '../lib/cn'
 import { relativeTime } from '../lib/format'
 import type { MediaItem, Post } from '../lib/types'
 import { Avatar } from './Avatar'
@@ -61,7 +63,20 @@ export function PostCard({ post, onDeleted }: { post: Post; onDeleted?: (id: str
         ) : null}
       </div>
 
-      <Link to={`/post/${post.id}`} className="mt-3 block">
+      {post.category ? (
+        <Link
+          to={`/?category=${encodeURIComponent(post.category.slug)}`}
+          className={cn(
+            'mt-3 inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[10.5px] font-semibold uppercase tracking-[0.06em] transition hover:opacity-80',
+            accent(post.category.accent).chip,
+          )}
+        >
+          <span className={cn('size-1.5 rounded-full', accent(post.category.accent).dot)} />
+          {post.category.name}
+        </Link>
+      ) : null}
+
+      <Link to={`/post/${post.id}`} className={cn('block', post.category ? 'mt-2' : 'mt-3')}>
         {post.title ? (
           <h2 className="text-[17.5px] font-semibold leading-snug tracking-[-0.022em]">{post.title}</h2>
         ) : null}

@@ -7,6 +7,9 @@ import { Logo, LogoMark } from './Logo'
 import { AuthHero } from './AuthHero'
 import { NotificationBell } from './NotificationBell'
 import { NotificationsProvider } from '../lib/notifications'
+import { CategoriesProvider } from '../lib/categories'
+import { CategoryNav, OnlineNow } from './SidebarSections'
+import { InstallEntry } from './InstallPrompt'
 
 const navigation = [
   { to: '/', label: 'Timeline', icon: Home, end: true },
@@ -33,28 +36,35 @@ function Sidebar() {
         <Logo />
       </div>
 
-      <nav className="space-y-1">
-        {navigation.map((item) => (
-          <NavLink key={item.to} to={item.to} end={item.end} className={navClass}>
-            <item.icon className="size-4" />
-            {item.label}
-          </NavLink>
-        ))}
-      </nav>
+      <div className="no-scrollbar -mx-1 min-h-0 flex-1 space-y-5 overflow-y-auto px-1 pb-2">
+        <nav className="space-y-1">
+          {navigation.map((item) => (
+            <NavLink key={item.to} to={item.to} end={item.end} className={navClass}>
+              <item.icon className="size-4" />
+              {item.label}
+            </NavLink>
+          ))}
+        </nav>
 
-      {profile?.role === 'admin' ? (
-        <>
-          <p className="mt-6 px-3 pb-1.5 text-[10.5px] font-semibold uppercase tracking-[0.14em] text-faint">
-            Administration
-          </p>
-          <NavLink to="/dobby" className={navClass}>
-            <ShieldCheck className="size-4" />
-            Dobby
-          </NavLink>
-        </>
-      ) : null}
+        <OnlineNow />
 
-      <div className="mt-auto space-y-2 pt-6">
+        <CategoryNav />
+
+        {profile?.role === 'admin' ? (
+          <>
+            <p className="px-3 pb-1.5 text-[10.5px] font-semibold uppercase tracking-[0.14em] text-faint">
+              Administration
+            </p>
+            <NavLink to="/dobby" className={navClass}>
+              <ShieldCheck className="size-4" />
+              Dobby
+            </NavLink>
+          </>
+        ) : null}
+      </div>
+
+      <div className="mt-auto space-y-1 border-t border-hair/70 pt-3">
+        <InstallEntry />
         <NotificationBell withLabel direction="up" align="left" />
         <NavLink to="/profile" className={navClass}>
           <UserRound className="size-4" />
@@ -124,18 +134,20 @@ function MobileTabs() {
 
 export function AppLayout() {
   return (
-    <NotificationsProvider>
-      <div className="min-h-dvh bg-canvas">
-        <Sidebar />
-        <div className="lg:pl-[264px]">
-          <MobileHeader />
-          <main className="mx-auto w-full max-w-[760px] px-4 pb-24 pt-5 sm:px-6 sm:pt-8 lg:pb-14">
-            <Outlet />
-          </main>
+    <CategoriesProvider>
+      <NotificationsProvider>
+        <div className="min-h-dvh bg-canvas">
+          <Sidebar />
+          <div className="lg:pl-[264px]">
+            <MobileHeader />
+            <main className="mx-auto w-full max-w-[760px] px-4 pb-24 pt-5 sm:px-6 sm:pt-8 lg:pb-14">
+              <Outlet />
+            </main>
+          </div>
+          <MobileTabs />
         </div>
-        <MobileTabs />
-      </div>
-    </NotificationsProvider>
+      </NotificationsProvider>
+    </CategoriesProvider>
   )
 }
 

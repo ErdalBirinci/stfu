@@ -1,0 +1,25 @@
+{
+  "name": "STFU — the circle",
+  "short_name": "STFU",
+  "description": "A private circle for a small group of friends: a shared timeline, an event calendar and a memory archive.",
+  "id": "./",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "display_override": ["standalone", "minimal-ui"],
+  "orientation": "any",
+  "background_color": "#f7f7fa",
+  "theme_color": "#f5f5f7",
+  "lang": "en",
+  "dir": "ltr",
+  "categories": ["social", "lifestyle"],
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ],
+  "shortcuts": [
+    { "name": "Calendar", "url": "./calendar", "icons": [{ "src": "icons/icon-192.png", "sizes": "192x192" }] },
+    { "name": "Memories", "url": "./memories", "icons": [{ "src": "icons/icon-192.png", "sizes": "192x192" }] }
+  ]
+}

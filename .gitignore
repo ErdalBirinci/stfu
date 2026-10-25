@@ -10,3 +10,5 @@ dist
 !.vscode/extensions.json
 npm-debug.log*
 /freebuff-sites-build/
+# Supabase CLI leftovers (never contains project secrets, still noise)
+supabase/.temp

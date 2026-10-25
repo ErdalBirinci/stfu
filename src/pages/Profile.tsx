@@ -7,6 +7,7 @@ import { displayEmail, fullDate, relativeTime, shortDate } from '../lib/format'
 import { signedUrl, uploadAvatar, uploadCover } from '../lib/media'
 import { useAsyncData } from '../lib/hooks'
 import { Avatar } from '../components/Avatar'
+import { DeviceSettings } from '../components/DeviceSettings'
 import { useToast } from '../components/Toast'
 import { PageHeader, Spinner } from '../components/Ui'
 
@@ -340,6 +341,8 @@ export function ProfilePage() {
           ) : null}
         </section>
       ) : null}
+
+      <DeviceSettings />
 
       <section className="card mt-3.5 p-5">
         <div className="flex items-center gap-2">
