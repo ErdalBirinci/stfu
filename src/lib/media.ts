@@ -53,6 +53,25 @@ async function compressImage(file: File): Promise<File> {
   }
 }
 
+/** A 24px preview used as an instant blurred placeholder while a photo loads. */
+async function makeBlurData(file: File): Promise<string | null> {
+  if (!file.type.startsWith('image/') || file.type === 'image/gif') return null
+  try {
+    const bitmap = await createImageBitmap(file)
+    const scale = Math.min(1, 24 / Math.max(bitmap.width, bitmap.height))
+    const canvas = document.createElement('canvas')
+    canvas.width = Math.max(1, Math.round(bitmap.width * scale))
+    canvas.height = Math.max(1, Math.round(bitmap.height * scale))
+    const context = canvas.getContext('2d')
+    if (!context) return null
+    context.drawImage(bitmap, 0, 0, canvas.width, canvas.height)
+    bitmap.close?.()
+    return canvas.toDataURL('image/webp', 0.4)
+  } catch {
+    return null
+  }
+}
+
 function extensionOf(file: File): string {
   const fromName = file.name.includes('.') ? file.name.split('.').pop() : ''
   if (fromName && fromName.length <= 5) return fromName.toLowerCase()
@@ -137,6 +156,7 @@ async function uploadOne(ownerId: string, original: File): Promise<Omit<MediaIte
     file_name: file.name,
     mime_type: file.type || 'application/octet-stream',
     size_bytes: file.size,
+    blur_data: await makeBlurData(file),
   }
 }
 
@@ -159,7 +179,9 @@ export async function uploadMediaFiles(
         comment_id: target.comment_id ?? null,
         memory_id: target.memory_id ?? null,
       })
-      .select('id, owner_id, kind, storage_path, file_name, mime_type, size_bytes, post_id, comment_id, memory_id, created_at')
+      .select(
+        'id, owner_id, kind, storage_path, file_name, mime_type, size_bytes, post_id, comment_id, memory_id, created_at, blur_data',
+      )
       .single()
     if (error) throw error
     created.push(data as MediaItem)
@@ -183,6 +205,18 @@ export async function uploadAvatar(ownerId: string, original: File): Promise<str
 export async function uploadCover(ownerId: string, original: File): Promise<string> {
   const file = await compressImage(original)
   const path = `${ownerId}/covers/${crypto.randomUUID()}.${extensionOf(file)}`
+  const { error } = await supabase.storage.from(MEDIA_BUCKET).upload(path, file, {
+    cacheControl: '3600',
+    contentType: file.type || undefined,
+    upsert: false,
+  })
+  if (error) throw error
+  return path
+}
+
+export async function uploadEventCover(ownerId: string, original: File): Promise<string> {
+  const file = await compressImage(original)
+  const path = `${ownerId}/events/${crypto.randomUUID()}.${extensionOf(file)}`
   const { error } = await supabase.storage.from(MEDIA_BUCKET).upload(path, file, {
     cacheControl: '3600',
     contentType: file.type || undefined,

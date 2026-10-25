@@ -1,10 +1,12 @@
 import { useMemo, useState } from 'react'
-import { Pin, Plus, Tag, Trash2 } from 'lucide-react'
+import { Eye, EyeOff, Pin, Plus, Tag, Trash2 } from 'lucide-react'
 import {
+  bulkLabel,
   createCategory,
   deleteCategory,
   fetchCategories,
   fetchLabelablePosts,
+  hidePost,
   setPostCategory,
   setPostPinned,
   updateCategory,
@@ -133,6 +135,9 @@ export function AdminLabels() {
   const [creating, setCreating] = useState(false)
   const [busyPost, setBusyPost] = useState<string | null>(null)
   const [pendingDelete, setPendingDelete] = useState<Category | null>(null)
+  const [selected, setSelected] = useState<string[]>([])
+  const [bulkTarget, setBulkTarget] = useState('')
+  const [bulkBusy, setBulkBusy] = useState(false)
 
   const list = categories.data ?? []
 
@@ -166,6 +171,34 @@ export function AdminLabels() {
       toast(post.pinned_at ? 'Post unpinned.' : 'Pinned to the top.', 'success')
     } catch (error) {
       toast(error instanceof Error ? error.message : 'Could not change the pin.', 'error')
+    } finally {
+      setBusyPost(null)
+    }
+  }
+
+  async function fileSelected() {
+    if (!bulkTarget || selected.length === 0) return
+    setBulkBusy(true)
+    try {
+      const changed = await bulkLabel(selected, bulkTarget)
+      toast(`${changed} ${changed === 1 ? 'post' : 'posts'} filed.`, 'success')
+      setSelected([])
+      refreshAll()
+    } catch (error) {
+      toast(error instanceof Error ? error.message : 'Could not file those posts.', 'error')
+    } finally {
+      setBulkBusy(false)
+    }
+  }
+
+  async function toggleHidden(post: Post) {
+    setBusyPost(post.id)
+    try {
+      await hidePost(post.id, !post.hidden_at)
+      posts.reload()
+      toast(post.hidden_at ? 'Post is back on the timeline.' : 'Post hidden from the circle.', 'success')
+    } catch (error) {
+      toast(error instanceof Error ? error.message : 'Could not change visibility.', 'error')
     } finally {
       setBusyPost(null)
     }
@@ -264,6 +297,41 @@ export function AdminLabels() {
           </p>
         </div>
 
+        {selected.length > 0 ? (
+          <div className="flex flex-wrap items-center gap-2 border-b border-hair/70 bg-[#f5f8ff] px-4 py-2.5">
+            <span className="text-[12px] font-semibold">{selected.length} selected</span>
+            <select
+              value={bulkTarget}
+              onChange={(event) => setBulkTarget(event.target.value)}
+              aria-label="Label for the selected posts"
+              className="field !w-[150px] !py-1.5 !text-[12px]"
+            >
+              <option value="">Choose label</option>
+              {list.map((category) => (
+                <option key={category.id} value={category.id}>
+                  {category.name}
+                </option>
+              ))}
+            </select>
+            <button
+              type="button"
+              onClick={() => void fileSelected()}
+              disabled={!bulkTarget || bulkBusy}
+              className="btn btn-primary !px-3 !py-1.5 !text-[12px]"
+            >
+              {bulkBusy ? <Spinner /> : <Tag className="size-3.5" />}
+              File them
+            </button>
+            <button
+              type="button"
+              onClick={() => setSelected([])}
+              className="text-[11.5px] font-medium text-faint transition hover:text-ink"
+            >
+              Clear
+            </button>
+          </div>
+        ) : null}
+
         {posts.error ? (
           <div className="p-4">
             <ErrorNote message={posts.error} onRetry={posts.reload} />
@@ -289,8 +357,26 @@ export function AdminLabels() {
               const current = categories.data?.find((item) => item.id === post.category_id)
               return (
                 <li key={post.id} className="flex flex-wrap items-center gap-2.5 px-4 py-3">
+                  <input
+                    type="checkbox"
+                    checked={selected.includes(post.id)}
+                    onChange={(event) =>
+                      setSelected((current) =>
+                        event.target.checked
+                          ? [...current, post.id]
+                          : current.filter((value) => value !== post.id),
+                      )
+                    }
+                    aria-label={`Select ${title}`}
+                    className="size-4 shrink-0 rounded border-hair accent-[#0a6cf5]"
+                  />
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-[12.5px] font-medium">{title}</p>
+                    {post.hidden_at ? (
+                      <span className="mt-0.5 inline-flex items-center gap-1 rounded-full bg-[#f3f3f7] px-1.5 py-0.5 text-[9.5px] font-semibold uppercase tracking-[0.08em] text-faint">
+                        Hidden from the circle
+                      </span>
+                    ) : null}
                     <p className="mt-0.5 text-[10.5px] text-faint">
                       {post.author?.display_name ?? 'Member'} · {relativeTime(post.created_at)}
                     </p>
@@ -310,6 +396,21 @@ export function AdminLabels() {
                     )}
                   >
                     <Pin className={cn('size-3.5', post.pinned_at && 'fill-current')} />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => void toggleHidden(post)}
+                    aria-pressed={Boolean(post.hidden_at)}
+                    aria-label={post.hidden_at ? `Show ${title} again` : `Hide ${title}`}
+                    title={post.hidden_at ? 'Hidden — click to show it again' : 'Hide from the timeline'}
+                    className={cn(
+                      'grid size-7 shrink-0 place-items-center rounded-full transition',
+                      post.hidden_at
+                        ? 'bg-[#f3f3f7] text-ink'
+                        : 'text-faint hover:bg-[#f4f4f8] hover:text-ink',
+                    )}
+                  >
+                    {post.hidden_at ? <EyeOff className="size-3.5" /> : <Eye className="size-3.5" />}
                   </button>
                   <select
                     value={post.category_id ?? ''}

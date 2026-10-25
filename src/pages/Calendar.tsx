@@ -1,13 +1,15 @@
 import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { CalendarDays, ChevronLeft, ChevronRight, Clock, MapPin, Plus, Users } from 'lucide-react'
+import { CalendarDays, ChevronLeft, ChevronRight, Clock, ImagePlus, MapPin, Plus, Users } from 'lucide-react'
 import { createEvent, fetchEvents } from '../lib/api'
 import { useAuth } from '../lib/auth'
+import { uploadEventCover } from '../lib/media'
 import { cn } from '../lib/cn'
 import { clockTime, dayKey, eventRange, monthLabel, toLocalInputValue } from '../lib/format'
 import { useAsyncData } from '../lib/hooks'
 import type { CircleEvent } from '../lib/types'
 import { Modal } from '../components/Modal'
+import { supabase } from '../lib/supabase'
 import { useToast } from '../components/Toast'
 import { EmptyState, ErrorNote, PageHeader, Spinner } from '../components/Ui'
 
@@ -42,7 +44,20 @@ function EventForm({ onCreated }: { onCreated: () => void }) {
     return toLocalInputValue(next)
   })
   const [endsAt, setEndsAt] = useState('')
+  const [coverFile, setCoverFile] = useState<File | null>(null)
+  const [coverPreview, setCoverPreview] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
+
+  async function pickCover(files: FileList | null) {
+    const file = files?.[0]
+    if (!file) return
+    if (!file.type.startsWith('image/')) {
+      toast('Choose an image for the cover.', 'error')
+      return
+    }
+    setCoverFile(file)
+    setCoverPreview(URL.createObjectURL(file))
+  }
 
   async function submit() {
     if (title.trim().length < 3) {
@@ -55,6 +70,12 @@ function EventForm({ onCreated }: { onCreated: () => void }) {
     }
     setSaving(true)
     try {
+      let coverPath: string | null = null
+      if (coverFile) {
+        const { data: session } = await supabase.auth.getUser()
+        const userId = session.user?.id
+        if (userId) coverPath = await uploadEventCover(userId, coverFile)
+      }
       await createEvent({
         title,
         description,
@@ -62,6 +83,7 @@ function EventForm({ onCreated }: { onCreated: () => void }) {
         startsAt: new Date(startsAt).toISOString(),
         endsAt: endsAt ? new Date(endsAt).toISOString() : null,
         allDay,
+        coverPath,
       })
       toast('Event added to the calendar.', 'success')
       onCreated()
@@ -126,6 +148,31 @@ function EventForm({ onCreated }: { onCreated: () => void }) {
         />
         All-day event
       </label>
+
+      <div>
+        <span className="label">Cover photo <span className="font-normal text-faint">optional</span></span>
+        <label className="flex cursor-pointer items-center gap-2.5 rounded-2xl border border-dashed border-[#dcdce4] bg-[#fbfbfd] p-2.5 transition hover:border-[#c9d3e3]">
+          {coverPreview ? (
+            <img src={coverPreview} alt="" className="size-14 rounded-xl object-cover" />
+          ) : (
+            <span className="grid size-14 place-items-center rounded-xl bg-[#f1f1f5] text-[#b6b6c0]">
+              <ImagePlus className="size-5" />
+            </span>
+          )}
+          <span className="min-w-0 flex-1">
+            <span className="block text-[12.5px] font-medium">
+              {coverFile ? coverFile.name : 'Add a picture for the event'}
+            </span>
+            <span className="block text-[11px] text-faint">It shows at the top of the event page.</span>
+          </span>
+          <input
+            type="file"
+            accept="image/*"
+            className="hidden"
+            onChange={(event) => void pickCover(event.target.files)}
+          />
+        </label>
+      </div>
 
       <div>
         <label className="label" htmlFor="event-location">

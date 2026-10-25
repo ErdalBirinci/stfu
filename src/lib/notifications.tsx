@@ -113,6 +113,8 @@ export function notificationText(notification: AppNotification): string {
       return notification.body ? `${name} added “${notification.body}”` : `${name} added a memory`
     case 'reminder':
       return notification.body ? `Reminder: “${notification.body}” starts within a day` : 'An event starts soon'
+    case 'mention':
+      return `${name} mentioned you`
     default:
       return `${name} did something`
   }
@@ -126,6 +128,7 @@ export function notificationHref(notification: AppNotification): string {
     case 'memory':
       return notification.entity_id ? `/memories/${notification.entity_id}` : '/memories'
     case 'comment':
+    case 'mention':
       return notification.memory_id
         ? `/memories/${notification.memory_id}#comments`
         : notification.post_id

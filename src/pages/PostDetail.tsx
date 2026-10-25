@@ -4,11 +4,13 @@ import { ArrowLeft, CornerDownRight, MessageCircle, Send, Trash2 } from 'lucide-
 import { addComment, deletePost, fetchPost } from '../lib/api'
 import { useAuth } from '../lib/auth'
 import { relativeTime } from '../lib/format'
+import { MentionInput, MentionText } from '../lib/mentions'
 import type { Comment, MediaItem, PickedFile } from '../lib/types'
 import { Avatar } from '../components/Avatar'
 import { Lightbox } from '../components/Lightbox'
 import { MediaGrid } from '../components/MediaGrid'
 import { MediaPicker, releasePickedFiles } from '../components/MediaPicker'
+import { PollCard } from '../components/Poll'
 import { ReactionBar } from '../components/ReactionBar'
 import { ErrorNote, LoadingRows, Spinner } from '../components/Ui'
 import { useToast } from '../components/Toast'
@@ -37,7 +39,9 @@ function CommentBubble({
             <p className="text-[11px] text-faint">{relativeTime(comment.created_at)}</p>
           </div>
           {comment.body ? (
-            <p className="mt-1 whitespace-pre-line text-[13.5px] leading-relaxed text-[#3c3c41]">{comment.body}</p>
+            <p className="mt-1 whitespace-pre-line text-[13.5px] leading-relaxed text-[#3c3c41]">
+              <MentionText text={comment.body} />
+            </p>
           ) : null}
           {(comment.media ?? []).length > 0 ? (
             <div className="mt-2">
@@ -86,7 +90,7 @@ function CommentBubble({
                   </div>
                   {reply.body ? (
                     <p className="mt-0.5 whitespace-pre-line text-[13px] leading-relaxed text-[#3c3c41]">
-                      {reply.body}
+                      <MentionText text={reply.body} />
                     </p>
                   ) : null}
                   {(reply.media ?? []).length > 0 ? (
@@ -150,11 +154,11 @@ function ReplyForm({
 
   return (
     <div className="mt-2 rounded-2xl border border-hair bg-white p-2.5">
-      <textarea
+      <MentionInput
         autoFocus
         value={body}
-        onChange={(event) => setBody(event.target.value)}
-        placeholder="Write a reply…"
+        onChange={setBody}
+        placeholder="Write a reply… use @ to bring someone in."
         rows={2}
         className="w-full resize-none border-0 bg-transparent p-1 text-[13px] leading-relaxed outline-none placeholder:text-[#a9a9b0]"
       />
@@ -247,7 +251,9 @@ export function PostDetailPage() {
             </h1>
           ) : null}
           {post.body ? (
-            <p className="mt-2.5 whitespace-pre-line text-[14.5px] leading-[1.7] text-[#33333a]">{post.body}</p>
+            <p className="mt-2.5 whitespace-pre-line text-[14.5px] leading-[1.7] text-[#33333a]">
+              <MentionText text={post.body} />
+            </p>
           ) : null}
 
           {(post.media ?? []).length > 0 ? (
@@ -257,6 +263,10 @@ export function PostDetailPage() {
                 onOpen={(_items: MediaItem[], index: number) => setLightboxIndex(index)}
               />
             </div>
+          ) : null}
+
+          {post.poll && post.poll.length >= 2 ? (
+            <PollCard postId={post.id} options={post.poll} onChange={reload} />
           ) : null}
 
           <ReactionBar postId={post.id} reactions={post.reactions} />

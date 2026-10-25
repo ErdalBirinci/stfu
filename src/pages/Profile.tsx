@@ -8,6 +8,7 @@ import { signedUrl, uploadAvatar, uploadCover } from '../lib/media'
 import { useAsyncData } from '../lib/hooks'
 import { Avatar } from '../components/Avatar'
 import { DeviceSettings } from '../components/DeviceSettings'
+import { RecapCard } from '../components/Recap'
 import { useToast } from '../components/Toast'
 import { PageHeader, Spinner } from '../components/Ui'
 
@@ -189,7 +190,7 @@ export function ProfilePage() {
         </div>
 
         <div className="px-5 pb-1">
-          <div className="relative z-10 -mt-9 flex flex-wrap items-end gap-3">
+          <div className="relative z-10 -mt-9 flex items-end justify-between gap-3">
             <div className="relative shrink-0">
               {preview ? (
                 <img
@@ -220,18 +221,23 @@ export function ProfilePage() {
               />
             </div>
 
-            <div className="min-w-0 flex-1 pb-1">
-              <p className="truncate text-[18px] font-semibold">{displayName || 'Your name'}</p>
-              <p className="text-[12.5px] text-muted">{displayEmail(session?.user.email)}</p>
-              <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
-                <span className="rounded-full bg-[#f2f4f8] px-2 py-0.5 text-[10.5px] font-semibold uppercase tracking-[0.06em] text-muted">
-                  {profile?.role === 'admin' ? 'Admin' : 'Member'}
-                </span>
-                <span className="rounded-full bg-[#eefaf2] px-2 py-0.5 text-[10.5px] font-semibold uppercase tracking-[0.06em] text-positive">
-                  Approved
-                </span>
-              </div>
+            <div className="mb-1 flex flex-wrap items-center justify-end gap-1.5">
+              <span className="rounded-full bg-[#f2f4f8] px-2 py-0.5 text-[10.5px] font-semibold uppercase tracking-[0.06em] text-muted">
+                {profile?.role === 'admin' ? 'Admin' : 'Member'}
+              </span>
+              <span className="rounded-full bg-[#eefaf2] px-2 py-0.5 text-[10.5px] font-semibold uppercase tracking-[0.06em] text-positive">
+                Approved
+              </span>
             </div>
+          </div>
+
+          <div className="mt-3 min-w-0">
+            <p className="break-words text-[20px] font-semibold leading-tight tracking-[-0.02em]">
+              {displayName || 'Your name'}
+            </p>
+            <p className="mt-0.5 truncate text-[12.5px] text-muted">
+              {displayEmail(session?.user.email)}
+            </p>
           </div>
 
           <div className="mt-4 grid grid-cols-3 gap-2">
@@ -341,6 +347,8 @@ export function ProfilePage() {
           ) : null}
         </section>
       ) : null}
+
+      <RecapCard />
 
       <DeviceSettings />
 

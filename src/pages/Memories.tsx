@@ -1,12 +1,14 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Camera, Images, Pencil, Plus } from 'lucide-react'
+import { Camera, Images, Lock, Pencil, Plus } from 'lucide-react'
 import { fetchMemories } from '../lib/api'
 import { useAuth } from '../lib/auth'
 import { shortDate } from '../lib/format'
 import { useAsyncData } from '../lib/hooks'
 import type { Memory } from '../lib/types'
+import { cn } from '../lib/cn'
 import { Avatar } from '../components/Avatar'
+import { blurStyle } from '../components/MediaGrid'
 import { MemoryForm } from '../components/MemoryForm'
 import { Modal } from '../components/Modal'
 import { EmptyState, ErrorNote, PageHeader } from '../components/Ui'
@@ -15,9 +17,27 @@ function coverOf(memory: Memory) {
   return (memory.media ?? []).find((item) => item.kind !== 'audio')
 }
 
-function MemoryCard({ memory, onEdit }: { memory: Memory; onEdit?: () => void }) {
+function yearOf(memory: Memory): number {
+  const stamp = memory.taken_on ?? memory.created_at
+  return new Date(stamp.length > 10 ? stamp : `${stamp}T12:00:00`).getFullYear()
+}
+
+function isSealed(memory: Memory): boolean {
+  return memory.publish_at ? new Date(memory.publish_at).getTime() > Date.now() : false
+}
+
+function MemoryCard({
+  memory,
+  featured = false,
+  onEdit,
+}: {
+  memory: Memory
+  featured?: boolean
+  onEdit?: () => void
+}) {
   const cover = coverOf(memory)
   const count = (memory.media ?? []).length
+  const sealed = isSealed(memory)
 
   return (
     <div className="group relative">
@@ -25,13 +45,34 @@ function MemoryCard({ memory, onEdit }: { memory: Memory; onEdit?: () => void })
         to={`/memories/${memory.id}`}
         className="card block overflow-hidden text-left transition duration-300 hover:-translate-y-0.5 hover:shadow-lift"
       >
-        <div className="relative aspect-[4/3] overflow-hidden bg-[#f1f1f5]">
-          {cover?.url && cover.kind === 'image' ? (
+        <div
+          className={cn(
+            'relative overflow-hidden bg-[#f1f1f5]',
+            featured ? 'aspect-[16/9] sm:aspect-[2/1]' : 'aspect-[4/3]',
+          )}
+        >
+          {sealed ? (
+            <div className="grid size-full place-items-center bg-[linear-gradient(135deg,#efeafc_0%,#f7f3ff_45%,#eaf2ff_100%)] text-center">
+              <div>
+                <Lock className="mx-auto size-6 text-[#8a76b8]" />
+                <p className="mt-1.5 px-4 text-[11.5px] font-semibold text-[#6f5f96]">
+                  Sealed until{' '}
+                  {memory.publish_at
+                    ? new Date(memory.publish_at).toLocaleDateString(undefined, {
+                        month: 'short',
+                        day: 'numeric',
+                      })
+                    : 'later'}
+                </p>
+              </div>
+            </div>
+          ) : cover?.url && cover.kind === 'image' ? (
             <img
               src={cover.url}
               alt={memory.title}
               loading="lazy"
-              className="size-full object-cover transition duration-500 group-hover:scale-[1.03]"
+              className="size-full bg-[#f1f1f5] object-cover transition duration-500 group-hover:scale-[1.03]"
+              style={blurStyle(cover)}
             />
           ) : cover?.url && cover.kind === 'video' ? (
             <video src={cover.url} className="size-full object-cover" preload="metadata" muted playsInline />
@@ -82,9 +123,13 @@ export function MemoriesPage() {
   const { profile } = useAuth()
   const [formOpen, setFormOpen] = useState(false)
   const [editing, setEditing] = useState<Memory | null>(null)
+  const [year, setYear] = useState<number | null>(null)
   const { data, loading, error, reload } = useAsyncData<Memory[]>(() => fetchMemories(), [])
 
   const canEdit = (memory: Memory) => profile?.id === memory.created_by || profile?.role === 'admin'
+
+  const years = [...new Set((data ?? []).map(yearOf))].sort((a, b) => b - a)
+  const visible = year === null ? (data ?? []) : (data ?? []).filter((memory) => yearOf(memory) === year)
 
   return (
     <>
@@ -102,6 +147,26 @@ export function MemoriesPage() {
 
       {error ? <ErrorNote message={error} onRetry={reload} /> : null}
 
+      {years.length > 1 ? (
+        <div className="no-scrollbar -mx-1 mb-3 flex gap-1.5 overflow-x-auto px-1 pb-0.5">
+          {[null, ...years].map((value) => (
+            <button
+              key={value ?? 'all'}
+              type="button"
+              onClick={() => setYear(value)}
+              className={cn(
+                'shrink-0 rounded-full border px-3 py-1.5 text-[12px] font-medium transition',
+                year === value
+                  ? 'border-transparent bg-ink text-white'
+                  : 'border-hair bg-white text-muted hover:text-ink',
+              )}
+            >
+              {value ?? 'All years'}
+            </button>
+          ))}
+        </div>
+      ) : null}
+
       {loading && !data ? (
         <div className="grid gap-3 sm:grid-cols-2">
           {[0, 1, 2, 3].map((index) => (
@@ -114,14 +179,16 @@ export function MemoriesPage() {
             </div>
           ))}
         </div>
-      ) : data && data.length > 0 ? (
+      ) : visible.length > 0 ? (
         <div className="stagger grid gap-3 sm:grid-cols-2">
-          {data.map((memory) => (
-            <MemoryCard
-              key={memory.id}
-              memory={memory}
-              onEdit={canEdit(memory) ? () => setEditing(memory) : undefined}
-            />
+          {visible.map((memory, index) => (
+            <div key={memory.id} className={index === 0 && visible.length > 2 ? 'sm:col-span-2' : ''}>
+              <MemoryCard
+                memory={memory}
+                featured={index === 0 && visible.length > 2}
+                onEdit={canEdit(memory) ? () => setEditing(memory) : undefined}
+              />
+            </div>
           ))}
         </div>
       ) : !error ? (

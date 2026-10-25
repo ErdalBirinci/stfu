@@ -4,10 +4,12 @@ import type {
   AdminStats,
   AdminStorage,
   AppNotification,
+  ArchivePayload,
   AuditEntry,
   Category,
   CategoryAccent,
   CircleEvent,
+  CircleRecap,
   Comment,
   MediaItem,
   Member,
@@ -21,32 +23,37 @@ import type {
   Role,
   RsvpStatus,
   SearchHit,
+  WeeklyPrompt,
 } from './types'
 
 const PROFILE_FIELDS = 'id, display_name, avatar_url, cover_url, bio, role, status, created_at, approved_at'
 const MEDIA_FIELDS =
-  'id, owner_id, kind, storage_path, file_name, mime_type, size_bytes, post_id, comment_id, memory_id, created_at'
+  'id, owner_id, kind, storage_path, file_name, mime_type, size_bytes, post_id, comment_id, memory_id, created_at, blur_data'
+const POLL_FIELDS = `poll:post_poll_options(id, label, position, votes:post_poll_votes(option_id, user_id))`
 const CATEGORY_FIELDS = 'id, name, slug, accent, position, created_at'
 const POST_CATEGORY = `category:categories!posts_category_id_fkey(${CATEGORY_FIELDS})`
-const POST_FIELDS = `id, author_id, title, body, category_id, pinned_at, created_at, updated_at,
+const POST_FIELDS = `id, author_id, title, body, category_id, pinned_at, hidden_at, created_at, updated_at,
   author:profiles!posts_author_id_fkey(${PROFILE_FIELDS}),
   ${POST_CATEGORY},
+  ${POLL_FIELDS},
   media(${MEDIA_FIELDS}),
   reactions:post_reactions(emoji, user_id),
   comments(count)`
-const POST_FIELDS_IN_CATEGORY = `id, author_id, title, body, category_id, pinned_at, created_at, updated_at,
+const POST_FIELDS_IN_CATEGORY = `id, author_id, title, body, category_id, pinned_at, hidden_at, created_at, updated_at,
   author:profiles!posts_author_id_fkey(${PROFILE_FIELDS}),
   category:categories!posts_category_id_fkey!inner(${CATEGORY_FIELDS}),
+  ${POLL_FIELDS},
   media(${MEDIA_FIELDS}),
   reactions:post_reactions(emoji, user_id),
   comments(count)`
 const NOTIFICATION_FIELDS = `id, user_id, actor_id, kind, entity_id, post_id, memory_id, body, read_at, created_at,
   actor:profiles!notifications_actor_id_fkey(id, display_name, avatar_url)`
-const EVENT_FIELDS = `id, title, description, location, starts_at, ends_at, all_day, created_by, created_at,
+const EVENT_FIELDS = `id, title, description, location, starts_at, ends_at, all_day, created_by, created_at, cover_path,
   creator:profiles!events_created_by_fkey(${PROFILE_FIELDS}),
   attendees:event_attendees(status, user_id, created_at, profile:profiles!event_attendees_user_id_fkey(${PROFILE_FIELDS}))`
-const MEMORY_FIELDS = `id, title, description, taken_on, created_by, created_at,
+const MEMORY_FIELDS = `id, title, description, taken_on, publish_at, event_id, created_by, created_at,
   creator:profiles!memories_created_by_fkey(${PROFILE_FIELDS}),
+  event:events!memories_event_id_fkey(id, title, starts_at),
   media(${MEDIA_FIELDS})`
 const MEMORY_COMMENT_FIELDS = `id, memory_id, author_id, body, created_at,
   author:profiles!comments_author_id_fkey(${PROFILE_FIELDS}),
@@ -115,6 +122,7 @@ export async function createPost(input: {
   title: string
   body: string
   files: File[]
+  pollOptions?: string[]
   onProgress?: (done: number, total: number) => void
 }): Promise<string> {
   const authorId = await currentUserId()
@@ -125,8 +133,36 @@ export async function createPost(input: {
     .single()
   if (error) throw error
   const postId = (data as { id: string }).id
+
+  const options = (input.pollOptions ?? []).map((label) => label.trim()).filter(Boolean)
+  if (options.length >= 2) {
+    const { error: pollError } = await supabase.from('post_poll_options').insert(
+      options.map((label, index) => ({ post_id: postId, label, position: index })),
+    )
+    if (pollError) throw pollError
+  }
+
   await uploadMediaFiles(authorId, input.files, { post_id: postId }, input.onProgress)
   return postId
+}
+
+/* ---------------------------------- polls -------------------------------- */
+
+export async function votePoll(postId: string, optionId: string, current: string | null): Promise<void> {
+  const userId = await currentUserId()
+  if (current === optionId) {
+    const { error } = await supabase
+      .from('post_poll_votes')
+      .delete()
+      .eq('post_id', postId)
+      .eq('user_id', userId)
+    if (error) throw error
+    return
+  }
+  const { error } = await supabase
+    .from('post_poll_votes')
+    .upsert({ post_id: postId, option_id: optionId, user_id: userId }, { onConflict: 'post_id,user_id' })
+  if (error) throw error
 }
 
 export async function deletePost(postId: string): Promise<void> {
@@ -190,7 +226,7 @@ export async function fetchLabelablePosts(limit = 60): Promise<Post[]> {
   const { data, error } = await supabase
     .from('posts')
     .select(
-      `id, author_id, title, body, category_id, pinned_at, created_at, updated_at,
+      `id, author_id, title, body, category_id, pinned_at, hidden_at, created_at, updated_at,
        author:profiles!posts_author_id_fkey(id, display_name),
        ${POST_CATEGORY}`,
     )
@@ -199,6 +235,19 @@ export async function fetchLabelablePosts(limit = 60): Promise<Post[]> {
     .limit(limit)
   if (error) throw error
   return (data ?? []) as unknown as Post[]
+}
+
+export async function hidePost(postId: string, hidden: boolean): Promise<void> {
+  const { error } = await supabase.rpc('hide_post', { target: postId, hidden })
+  if (!error) return
+  if (/Only an admin/i.test(error.message)) throw new Error('Only an admin can hide a post.')
+  throw new Error(error.message)
+}
+
+export async function bulkLabel(postIds: string[], categoryId: string): Promise<number> {
+  const { data, error } = await supabase.rpc('bulk_label', { targets: postIds, category: categoryId })
+  if (error) throw categoryError(error.message)
+  return (data as number) ?? postIds.length
 }
 
 export async function setPostPinned(postId: string, pinned: boolean): Promise<void> {
@@ -322,6 +371,7 @@ export async function createEvent(input: {
   startsAt: string
   endsAt: string | null
   allDay: boolean
+  coverPath?: string | null
 }): Promise<string> {
   const createdBy = await currentUserId()
   const { data, error } = await supabase
@@ -333,6 +383,7 @@ export async function createEvent(input: {
       starts_at: input.startsAt,
       ends_at: input.endsAt,
       all_day: input.allDay,
+      cover_path: input.coverPath ?? null,
       created_by: createdBy,
     })
     .select('id')
@@ -377,6 +428,84 @@ export async function fetchMemories(): Promise<Memory[]> {
   return memories
 }
 
+export async function fetchMemoriesForEvent(eventId: string): Promise<Memory[]> {
+  const { data, error } = await supabase
+    .from('memories')
+    .select(MEMORY_FIELDS)
+    .eq('event_id', eventId)
+    .order('created_at', { ascending: true })
+  if (error) throw error
+  const memories = (data ?? []) as unknown as Memory[]
+  await hydrateMedia(memories)
+  return memories
+}
+
+/** Memories from this exact day in earlier years — the archive resurfacing. */
+export async function fetchOnThisDay(): Promise<Memory[]> {
+  const { data, error } = await supabase
+    .from('memories')
+    .select(MEMORY_FIELDS)
+    .not('taken_on', 'is', null)
+    .order('taken_on', { ascending: false })
+    .limit(300)
+  if (error) throw error
+
+  const today = new Date()
+  const month = today.getMonth()
+  const day = today.getDate()
+  const year = today.getFullYear()
+  const hits = ((data ?? []) as unknown as Memory[]).filter((memory) => {
+    if (!memory.taken_on) return false
+    const date = new Date(`${memory.taken_on}T12:00:00`)
+    return date.getMonth() === month && date.getDate() === day && date.getFullYear() < year
+  })
+
+  const latest = hits.slice(0, 5)
+  await hydrateMedia(latest)
+  return latest
+}
+
+/* ------------------------------- weekly prompt --------------------------- */
+
+export async function fetchWeeklyPrompt(): Promise<WeeklyPrompt | null> {
+  const { data, error } = await supabase.rpc('weekly_prompt')
+  if (error) return null
+  const row = (Array.isArray(data) ? data[0] : data) as WeeklyPrompt | null
+  return row ?? null
+}
+
+/* ---------------------------- mentions and people ------------------------ */
+
+let memberNameCache: Array<{ id: string; display_name: string }> | null = null
+
+export async function fetchMemberNames(): Promise<Array<{ id: string; display_name: string }>> {
+  if (memberNameCache) return memberNameCache
+  const { data, error } = await supabase
+    .from('profiles')
+    .select('id, display_name')
+    .eq('status', 'approved')
+    .order('display_name', { ascending: true })
+  if (error) return []
+  memberNameCache = (data ?? []) as Array<{ id: string; display_name: string }>
+  return memberNameCache
+}
+
+/* ---------------------------------- recap -------------------------------- */
+
+export async function fetchRecap(year: number): Promise<CircleRecap> {
+  const { data, error } = await supabase.rpc('circle_recap', { target_year: year })
+  if (error) throw error
+  return data as CircleRecap
+}
+
+/* ------------------------------ archive export --------------------------- */
+
+export async function fetchArchive(): Promise<ArchivePayload> {
+  const { data, error } = await supabase.rpc('admin_archive')
+  if (error) throw error
+  return data as ArchivePayload
+}
+
 export async function fetchMemory(id: string): Promise<Memory> {
   const { data, error } = await supabase.from('memories').select(MEMORY_FIELDS).eq('id', id).single()
   if (error) throw error
@@ -389,6 +518,8 @@ export async function createMemory(input: {
   title: string
   description: string
   takenOn: string | null
+  publishAt?: string | null
+  eventId?: string | null
   files: File[]
   onProgress?: (done: number, total: number) => void
 }): Promise<string> {
@@ -399,6 +530,8 @@ export async function createMemory(input: {
       title: input.title.trim(),
       description: input.description.trim() || null,
       taken_on: input.takenOn,
+      publish_at: input.publishAt ?? null,
+      event_id: input.eventId ?? null,
       created_by: createdBy,
     })
     .select('id')
@@ -431,6 +564,8 @@ export async function updateMemory(input: {
   title: string
   description: string
   takenOn: string | null
+  publishAt?: string | null
+  eventId?: string | null
 }): Promise<void> {
   const { error } = await supabase
     .from('memories')
@@ -438,6 +573,8 @@ export async function updateMemory(input: {
       title: input.title.trim(),
       description: input.description.trim() || null,
       taken_on: input.takenOn,
+      ...(input.publishAt !== undefined ? { publish_at: input.publishAt } : {}),
+      ...(input.eventId !== undefined ? { event_id: input.eventId } : {}),
     })
     .eq('id', input.memoryId)
   if (error) throw error

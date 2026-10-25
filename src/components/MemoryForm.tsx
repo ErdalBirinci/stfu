@@ -8,10 +8,12 @@ import { useToast } from './Toast'
 
 export function MemoryForm({
   memory,
+  eventId,
   onSaved,
   onCancel,
 }: {
   memory?: Memory | null
+  eventId?: string | null
   onSaved: () => void
   onCancel?: () => void
 }) {
@@ -20,6 +22,7 @@ export function MemoryForm({
   const [title, setTitle] = useState(memory?.title ?? '')
   const [description, setDescription] = useState(memory?.description ?? '')
   const [takenOn, setTakenOn] = useState(memory?.taken_on ?? '')
+  const [unlockOn, setUnlockOn] = useState((memory?.publish_at ?? '').slice(0, 10))
   const [files, setFiles] = useState<PickedFile[]>([])
   const [saving, setSaving] = useState(false)
   const [progress, setProgress] = useState<{ done: number; total: number } | null>(null)
@@ -37,6 +40,8 @@ export function MemoryForm({
           title,
           description,
           takenOn: takenOn || null,
+          publishAt: unlockOn ? new Date(`${unlockOn}T09:00:00`).toISOString() : null,
+          eventId: eventId !== undefined ? eventId : undefined,
         })
         toast('Memory updated.', 'success')
       } else {
@@ -44,6 +49,8 @@ export function MemoryForm({
           title,
           description,
           takenOn: takenOn || null,
+          publishAt: unlockOn ? new Date(`${unlockOn}T09:00:00`).toISOString() : null,
+          eventId: eventId ?? null,
           files: files.map((item) => item.file),
           onProgress: (done, total) => setProgress({ done, total }),
         })
@@ -93,6 +100,23 @@ export function MemoryForm({
           value={takenOn}
           onChange={(event) => setTakenOn(event.target.value)}
         />
+      </div>
+
+      <div>
+        <label className="label" htmlFor="memory-seal">
+          Keep it sealed until <span className="font-normal text-faint">optional</span>
+        </label>
+        <input
+          id="memory-seal"
+          type="date"
+          className="field"
+          value={unlockOn}
+          min={new Date().toISOString().slice(0, 10)}
+          onChange={(event) => setUnlockOn(event.target.value)}
+        />
+        <p className="mt-1 text-[11px] text-faint">
+          A time capsule: only you can see the album until that morning, then it opens for everyone.
+        </p>
       </div>
 
       <div>

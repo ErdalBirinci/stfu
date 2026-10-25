@@ -6,11 +6,13 @@ import { useAuth } from '../lib/auth'
 import { accent } from '../lib/categories'
 import { cn } from '../lib/cn'
 import { relativeTime } from '../lib/format'
+import { MentionText } from '../lib/mentions'
 import type { MediaItem, Post } from '../lib/types'
 import { Avatar } from './Avatar'
 import { Lightbox } from './Lightbox'
 import { MediaGrid } from './MediaGrid'
 import { Modal } from './Modal'
+import { PollCard } from './Poll'
 import { ReactionBar } from './ReactionBar'
 import { useToast } from './Toast'
 
@@ -80,6 +82,11 @@ export function PostCard({
 
       {post.pinned_at || post.category ? (
         <div className="mt-3 flex flex-wrap items-center gap-1.5">
+          {post.hidden_at ? (
+            <span className="inline-flex items-center gap-1 rounded-full bg-[#f3f3f7] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.08em] text-faint">
+              Hidden
+            </span>
+          ) : null}
           {post.pinned_at ? (
             <span className="inline-flex items-center gap-1 rounded-full bg-[#fff6e6] px-2 py-0.5 text-[10.5px] font-semibold uppercase tracking-[0.06em] text-[#9a6a12]">
               <Pin className="size-2.5 fill-current" />
@@ -110,10 +117,12 @@ export function PostCard({
         ) : null}
         {post.body ? (
           <p className="mt-1.5 line-clamp-4 whitespace-pre-line text-[14px] leading-relaxed text-[#3c3c41]">
-            {post.body}
+            <MentionText text={post.body} />
           </p>
         ) : null}
       </Link>
+
+      {post.poll && post.poll.length >= 2 ? <PollCard postId={post.id} options={post.poll} /> : null}
 
       {(post.media ?? []).length > 0 ? (
         <div className="mt-3">

@@ -1,16 +1,39 @@
 import { useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
-import { ArrowLeft, CalendarDays, CalendarPlus, Clock, MapPin, Trash2, Users } from 'lucide-react'
-import { clearRsvp, deleteEvent, fetchEvent, setRsvp } from '../lib/api'
+import {
+  ArrowLeft,
+  CalendarDays,
+  CalendarPlus,
+  Clock,
+  Images,
+  MapPin,
+  Plus,
+  Trash2,
+  Users,
+} from 'lucide-react'
+import { clearRsvp, deleteEvent, fetchEvent, fetchMemoriesForEvent, setRsvp } from '../lib/api'
+import { cn } from '../lib/cn'
 import { useAuth } from '../lib/auth'
 import { eventRange, relativeTime } from '../lib/format'
 import { downloadEventIcs } from '../lib/ics'
-import { useAsyncData } from '../lib/hooks'
-import type { RsvpStatus } from '../lib/types'
+import { useAsyncData, useSignedUrl } from '../lib/hooks'
+import type { Memory, RsvpStatus } from '../lib/types'
 import { Avatar } from '../components/Avatar'
+import { blurStyle } from '../components/MediaGrid'
+import { MemoryForm } from '../components/MemoryForm'
 import { Modal } from '../components/Modal'
 import { useToast } from '../components/Toast'
 import { ErrorNote, LoadingRows, Spinner } from '../components/Ui'
+
+function countdownLabel(startsAt: string): string | null {
+  const diff = new Date(startsAt).getTime() - Date.now()
+  if (diff <= 0) return null
+  const hours = diff / 3_600_000
+  if (hours < 1) return `in ${Math.max(1, Math.round(diff / 60_000))} minutes`
+  if (hours < 24) return `in ${Math.round(hours)} hours`
+  const days = Math.round(hours / 24)
+  return days === 1 ? 'tomorrow' : `in ${days} days`
+}
 
 const OPTIONS: Array<{ value: RsvpStatus; label: string }> = [
   { value: 'going', label: 'Going' },
@@ -25,7 +48,13 @@ export function EventDetailPage() {
   const toast = useToast()
   const [saving, setSaving] = useState(false)
   const [confirmDelete, setConfirmDelete] = useState(false)
+  const [albumOpen, setAlbumOpen] = useState(false)
   const { data: event, loading, error, reload } = useAsyncData(() => fetchEvent(id), [id])
+  const album = useAsyncData<Memory[]>(
+    () => (event ? fetchMemoriesForEvent(event.id) : Promise.resolve([])),
+    [event?.id],
+  )
+  const coverUrl = useSignedUrl(event?.cover_path ?? null)
 
   if (loading && !event) return <LoadingRows count={1} height={200} />
   if (error) return <ErrorNote message={error} onRetry={reload} />
@@ -38,6 +67,8 @@ export function EventDetailPage() {
     ...option,
     people: attendees.filter((attendee) => attendee.status === option.value),
   }))
+  const albumMemories = album.data ?? []
+  const countdown = countdownLabel(event.starts_at)
 
   async function choose(status: RsvpStatus) {
     setSaving(true)
@@ -88,33 +119,66 @@ export function EventDetailPage() {
       </div>
 
       <article className="card overflow-hidden">
-        <div className="border-b border-hair/70 bg-gradient-to-br from-[#f7faff] to-white px-5 py-6">
-          <p className="mb-2 inline-flex items-center gap-1.5 rounded-full bg-white px-2.5 py-1 text-[11px] font-semibold text-accent-deep shadow-[0_1px_2px_rgba(20,20,43,0.06)]">
-            <CalendarDays className="size-3" />
-            {event.all_day ? 'All-day event' : 'Event'}
-          </p>
-          <h1 className="text-[27px] font-semibold leading-tight tracking-[-0.032em]">{event.title}</h1>
-          <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1.5 text-[13px] text-muted">
-            <span className="inline-flex items-center gap-1.5">
-              <Clock className="size-3.5" />
-              {eventRange(event.starts_at, event.ends_at, event.all_day)}
-            </span>
-            {event.location ? (
+        <div className="relative border-b border-hair/70 bg-gradient-to-br from-[#f7faff] to-white">
+          {coverUrl ? (
+            <>
+              <img src={coverUrl} alt="" className="absolute inset-0 size-full object-cover" />
+              <div className="absolute inset-0 bg-gradient-to-t from-[#101018]/85 via-[#101018]/45 to-[#101018]/15" />
+            </>
+          ) : null}
+          <div className={cn('relative px-5', coverUrl ? 'pb-6 pt-16 text-white' : 'py-6')}>
+            <div className="mb-2 flex flex-wrap items-center gap-1.5">
+              <p
+                className={cn(
+                  'inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-semibold shadow-[0_1px_2px_rgba(20,20,43,0.06)]',
+                  coverUrl ? 'bg-white/20 text-white backdrop-blur' : 'bg-white text-accent-deep',
+                )}
+              >
+                <CalendarDays className="size-3" />
+                {event.all_day ? 'All-day event' : 'Event'}
+              </p>
+              {countdown ? (
+                <p
+                  className={cn(
+                    'inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-semibold',
+                    coverUrl ? 'bg-white/20 text-white backdrop-blur' : 'bg-[#eef5ff] text-accent-deep',
+                  )}
+                >
+                  {countdown}
+                </p>
+              ) : null}
+            </div>
+            <h1 className="text-[27px] font-semibold leading-tight tracking-[-0.032em]">{event.title}</h1>
+            <div
+              className={cn(
+                'mt-3 flex flex-wrap items-center gap-x-4 gap-y-1.5 text-[13px]',
+                coverUrl ? 'text-white/85' : 'text-muted',
+              )}
+            >
               <span className="inline-flex items-center gap-1.5">
-                <MapPin className="size-3.5" />
-                {event.location}
+                <Clock className="size-3.5" />
+                {eventRange(event.starts_at, event.ends_at, event.all_day)}
               </span>
-            ) : null}
-          </div>
+              {event.location ? (
+                <span className="inline-flex items-center gap-1.5">
+                  <MapPin className="size-3.5" />
+                  {event.location}
+                </span>
+              ) : null}
+            </div>
 
-          <button
-            type="button"
-            onClick={() => downloadEventIcs(event)}
-            className="btn btn-quiet mt-3.5 !px-3 !py-1.5 !text-[12px]"
-          >
-            <CalendarPlus className="size-3.5" />
-            Add to calendar
-          </button>
+            <button
+              type="button"
+              onClick={() => downloadEventIcs(event)}
+              className={cn(
+                'btn mt-3.5 !px-3 !py-1.5 !text-[12px]',
+                coverUrl ? '!bg-white/20 text-white backdrop-blur hover:!bg-white/30' : 'btn-quiet',
+              )}
+            >
+              <CalendarPlus className="size-3.5" />
+              Add to calendar
+            </button>
+          </div>
         </div>
 
         <div className="px-5 py-5">
@@ -177,6 +241,61 @@ export function EventDetailPage() {
       </section>
 
       <section className="card mt-3.5 p-5">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <h2 className="flex items-center gap-2 text-[15px] font-semibold">
+            <Images className="size-4 text-faint" />
+            Memories from this night
+          </h2>
+          <button
+            type="button"
+            onClick={() => setAlbumOpen(true)}
+            className="btn btn-quiet !px-3 !py-1.5 !text-[12px]"
+          >
+            <Plus className="size-3.5" />
+            Add photos
+          </button>
+        </div>
+
+        {albumMemories.length === 0 ? (
+          <p className="mt-2 text-[12.5px] leading-relaxed text-muted">
+            Nothing here yet. Once the night happens, this is where the photos land.
+          </p>
+        ) : (
+          <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3">
+            {albumMemories.map((memory) => {
+              const cover = (memory.media ?? []).find((item) => item.kind === 'image')
+              return (
+                <Link
+                  key={memory.id}
+                  to={`/memories/${memory.id}`}
+                  className="group overflow-hidden rounded-xl border border-hair bg-white transition hover:-translate-y-0.5 hover:shadow-lift"
+                >
+                  <span className="block aspect-[4/3] overflow-hidden bg-[#f1f1f5]">
+                    {cover?.url ? (
+                      <img
+                        src={cover.url}
+                        alt=""
+                        loading="lazy"
+                        className="size-full bg-[#f1f1f5] object-cover transition duration-500 group-hover:scale-[1.03]"
+                        style={blurStyle(cover)}
+                      />
+                    ) : (
+                      <span className="grid size-full place-items-center text-[#b6b6c0]">
+                        <Images className="size-5" />
+                      </span>
+                    )}
+                  </span>
+                  <span className="block truncate px-2.5 py-1.5 text-[12px] font-medium">
+                    {memory.title}
+                  </span>
+                </Link>
+              )
+            })}
+          </div>
+        )}
+      </section>
+
+      <section className="card mt-3.5 p-5">
         <h2 className="flex items-center gap-2 text-[15px] font-semibold">
           <Users className="size-4 text-faint" />
           Who's coming
@@ -220,6 +339,23 @@ export function EventDetailPage() {
           </p>
         ) : null}
       </section>
+
+      <Modal
+        open={albumOpen}
+        onClose={() => setAlbumOpen(false)}
+        title={`Memories from ${event.title}`}
+        description="Start an album for this night and the whole circle can add to it."
+        width="sm:max-w-[480px]"
+      >
+        <MemoryForm
+          eventId={event.id}
+          onSaved={() => {
+            setAlbumOpen(false)
+            album.reload()
+          }}
+          onCancel={() => setAlbumOpen(false)}
+        />
+      </Modal>
 
       <Modal
         open={confirmDelete}

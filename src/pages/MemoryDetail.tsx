@@ -1,15 +1,16 @@
 import { useRef, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
-import { ArrowLeft, ImagePlus, MessageCircle, Pencil, Play, Send, Trash2 } from 'lucide-react'
+import { ArrowLeft, CalendarDays, ImagePlus, Lock, MessageCircle, Pencil, Play, Send, Trash2 } from 'lucide-react'
 import { addMemoryComment, addMemoryMedia, deleteMemory, fetchMemory, fetchMemoryComments } from '../lib/api'
 import { useAuth } from '../lib/auth'
 import { fileSize, fullDate, relativeTime, shortDate } from '../lib/format'
 import { useAsyncData } from '../lib/hooks'
 import { kindOf, signedUrl } from '../lib/media'
+import { MentionInput, MentionText } from '../lib/mentions'
 import type { MediaItem, MemoryComment, PickedFile } from '../lib/types'
 import { Avatar } from '../components/Avatar'
 import { Lightbox } from '../components/Lightbox'
-import { MediaGrid } from '../components/MediaGrid'
+import { MediaGrid, blurStyle } from '../components/MediaGrid'
 import { MediaPicker, releasePickedFiles } from '../components/MediaPicker'
 import { MemoryForm } from '../components/MemoryForm'
 import { Modal } from '../components/Modal'
@@ -31,7 +32,9 @@ function CommentBubble({ comment }: { comment: MemoryComment }) {
             <p className="text-[11px] text-faint">{relativeTime(comment.created_at)}</p>
           </div>
           {comment.body ? (
-            <p className="mt-1 whitespace-pre-line text-[13.5px] leading-relaxed text-[#3c3c41]">{comment.body}</p>
+            <p className="mt-1 whitespace-pre-line text-[13.5px] leading-relaxed text-[#3c3c41]">
+              <MentionText text={comment.body} />
+            </p>
           ) : null}
           {media.length > 0 ? (
             <div className="mt-2">
@@ -92,10 +95,10 @@ function CommentComposer({ memoryId, onPosted }: { memoryId: string; onPosted: (
   return (
     <div className="card p-4">
       <p className="mb-2 text-[12px] font-semibold text-muted">Add a comment or a photo</p>
-      <textarea
+      <MentionInput
         value={body}
-        onChange={(event) => setBody(event.target.value)}
-        placeholder="Say something about this memory…"
+        onChange={setBody}
+        placeholder="Say something about this memory… use @ to bring someone in."
         rows={2}
         maxLength={4000}
         className="w-full resize-none rounded-xl border border-hair bg-white px-3 py-2 text-[13.5px] leading-relaxed outline-none transition focus:border-[#c9d3e3] placeholder:text-[#a9a9b0]"
@@ -142,6 +145,8 @@ export function MemoryDetailPage() {
   const visuals = media.filter((item) => item.kind !== 'audio')
   const audio = media.filter((item) => item.kind === 'audio')
   const canManage = profile?.id === memory.created_by || profile?.role === 'admin'
+  const sealedUntil = memory.publish_at ? new Date(memory.publish_at) : null
+  const sealed = sealedUntil ? sealedUntil.getTime() > Date.now() : false
   const totalSize = media.reduce((sum, item) => sum + item.size_bytes, 0)
   const comments = thread.data ?? []
 
@@ -240,8 +245,30 @@ export function MemoryDetailPage() {
         </div>
       </div>
 
+      {sealed && sealedUntil ? (
+        <div className="mb-3 flex items-start gap-2.5 rounded-2xl border border-[#e3dcf7] bg-[linear-gradient(120deg,#f6f2ff_0%,#ffffff_70%)] px-4 py-3">
+          <Lock className="mt-0.5 size-4 shrink-0 text-[#8a76b8]" />
+          <p className="text-[12.5px] leading-relaxed text-[#5f537d]">
+            This is a time capsule, sealed until{' '}
+            <span className="font-semibold">
+              {sealedUntil.toLocaleDateString(undefined, { month: 'long', day: 'numeric', year: 'numeric' })}
+            </span>
+            . Only you can see it until then.
+          </p>
+        </div>
+      ) : null}
+
       <header className="card px-5 py-5">
         <h1 className="text-[26px] font-semibold leading-tight tracking-[-0.032em]">{memory.title}</h1>
+        {memory.event ? (
+          <Link
+            to={`/events/${memory.event.id}`}
+            className="mt-2 inline-flex items-center gap-1.5 rounded-full bg-accent-soft px-2.5 py-1 text-[11.5px] font-semibold text-accent-deep transition hover:bg-[#e2eeff]"
+          >
+            <CalendarDays className="size-3.5" />
+            {memory.event.title}
+          </Link>
+        ) : null}
         {memory.description ? (
           <p className="mt-1.5 whitespace-pre-line text-[14px] leading-relaxed text-[#3c3c41]">
             {memory.description}
@@ -304,7 +331,8 @@ export function MemoryDetailPage() {
                   src={item.url}
                   alt={item.file_name}
                   loading="lazy"
-                  className="size-full object-cover transition duration-500 group-hover:scale-[1.03]"
+                  className="size-full bg-[#f1f1f5] object-cover transition duration-500 group-hover:scale-[1.03]"
+                  style={blurStyle(item)}
                 />
               ) : item.url ? (
                 <video src={item.url} className="size-full object-cover" preload="metadata" muted playsInline />

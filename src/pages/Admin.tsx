@@ -31,12 +31,13 @@ import { fileSize, relativeTime, shortDate } from '../lib/format'
 import { useAsyncData } from '../lib/hooks'
 import type { AdminStats, AdminStorage, AuditEntry, Member } from '../lib/types'
 import { Avatar } from '../components/Avatar'
+import { AdminArchive } from '../components/AdminArchive'
 import { AdminLabels } from '../components/AdminLabels'
 import { useToast } from '../components/Toast'
 import { EmptyState, ErrorNote, PageHeader, Spinner } from '../components/Ui'
 import { NotFoundPage } from './NotFound'
 
-type Tab = 'requests' | 'members' | 'activity' | 'labels'
+type Tab = 'requests' | 'members' | 'activity' | 'labels' | 'archive'
 
 const STORAGE_LIMIT = 1024 * 1024 * 1024
 
@@ -311,6 +312,9 @@ export function AdminPage() {
           <button type="button" data-active={tab === 'labels'} onClick={() => setTab('labels')}>
             Labels
           </button>
+          <button type="button" data-active={tab === 'archive'} onClick={() => setTab('archive')}>
+            Archive
+          </button>
         </div>
 
         <div className="flex items-center gap-2">
@@ -343,6 +347,10 @@ export function AdminPage() {
       {tab === 'labels' ? (
         <div className="mt-3">
           <AdminLabels />
+        </div>
+      ) : tab === 'archive' ? (
+        <div className="mt-3">
+          <AdminArchive />
         </div>
       ) : tab === 'activity' ? (
         <section className="card mt-3 overflow-hidden">

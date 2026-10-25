@@ -1,15 +1,20 @@
-import { useCallback, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
-import { MessagesSquare, Pin, Tag, X } from 'lucide-react'
+import { ArrowUp, MessagesSquare, Pin, Tag, X } from 'lucide-react'
 import { Composer } from '../components/Composer'
+import type { ComposerSeed } from '../components/Composer'
+import { OnThisDay } from '../components/OnThisDay'
 import { PostCard } from '../components/PostCard'
+import { RitualCard } from '../components/RitualCard'
 import { EmptyState, ErrorNote, LoadingRows, PageHeader } from '../components/Ui'
 import { fetchFeed } from '../lib/api'
 import { useAuth } from '../lib/auth'
 import { accent, categoryCount, useCategories } from '../lib/categories'
 import { cn } from '../lib/cn'
-import { greeting } from '../lib/format'
+import { dayKey, greeting } from '../lib/format'
 import { useAsyncData } from '../lib/hooks'
+import { supabase } from '../lib/supabase'
+import type { Post } from '../lib/types'
 
 const PINNED_LIMIT = 3
 
@@ -34,6 +39,21 @@ export function TimelinePage() {
   )
 
   const [showAllPinned, setShowAllPinned] = useState(false)
+  const [seed, setSeed] = useState<ComposerSeed | undefined>(undefined)
+  const [fresh, setFresh] = useState(0)
+
+  // New posts arrive without yanking the page: a small pill counts them instead.
+  useEffect(() => {
+    const channel = supabase
+      .channel('timeline-fresh')
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'posts' }, () => {
+        setFresh((count) => count + 1)
+      })
+      .subscribe()
+    return () => {
+      void supabase.removeChannel(channel)
+    }
+  }, [])
 
   const posts = data ?? []
   // Pinned posts get their own strip above the feed, so the timeline reads like
@@ -104,7 +124,11 @@ export function TimelinePage() {
           Labels are filed by Dobby. Fresh posts wait here unfiled until they get one.
         </p>
       ) : (
-        <Composer onPosted={() => reload()} />
+        <>
+          <Composer onPosted={() => reload()} seed={seed} />
+          <OnThisDay />
+          <RitualCard onAnswer={(prompt) => setSeed({ body: prompt, stamp: Date.now() })} />
+        </>
       )}
 
       {error ? <ErrorNote message={error} onRetry={reload} /> : null}
@@ -145,8 +169,15 @@ export function TimelinePage() {
                 </p>
               ) : null}
               <div className="stagger space-y-3">
-                {feed.map((post) => (
-                  <PostCard key={post.id} post={post} onDeleted={handleDeleted} />
+                {groupByDay(feed).map((group) => (
+                  <div key={group.key} className="space-y-3">
+                    <p className="px-1 pt-1 text-[10.5px] font-semibold uppercase tracking-[0.14em] text-faint">
+                      {group.label}
+                    </p>
+                    {group.posts.map((post) => (
+                      <PostCard key={post.id} post={post} onDeleted={handleDeleted} />
+                    ))}
+                  </div>
                 ))}
               </div>
             </section>
@@ -170,8 +201,46 @@ export function TimelinePage() {
           }
         />
       ) : null}
+
+      {fresh > 0 ? (
+        <button
+          type="button"
+          onClick={() => {
+            setFresh(0)
+            reload()
+            window.scrollTo({ top: 0, behavior: 'smooth' })
+          }}
+          className="fixed bottom-[86px] left-1/2 z-20 inline-flex -translate-x-1/2 items-center gap-1.5 rounded-full bg-ink px-3.5 py-2 text-[12px] font-semibold text-white shadow-[0_16px_36px_-18px_rgba(20,20,43,0.9)] transition hover:bg-[#2c2c2f] lg:bottom-8"
+        >
+          <ArrowUp className="size-3.5" />
+          {fresh === 1 ? '1 new post' : `${fresh} new posts`}
+        </button>
+      ) : null}
     </>
   )
+}
+
+function groupByDay(posts: Post[]): Array<{ key: string; label: string; posts: Post[] }> {
+  const groups: Array<{ key: string; label: string; posts: Post[] }> = []
+  for (const post of posts) {
+    const created = new Date(post.created_at)
+    const key = dayKey(created)
+    const last = groups[groups.length - 1]
+    if (last && last.key === key) {
+      last.posts.push(post)
+    } else {
+      groups.push({ key, label: dayLabel(created), posts: [post] })
+    }
+  }
+  return groups
+}
+
+function dayLabel(date: Date): string {
+  const today = new Date()
+  const yesterday = new Date(today.getFullYear(), today.getMonth(), today.getDate() - 1)
+  if (dayKey(date) === dayKey(today)) return 'Today'
+  if (dayKey(date) === dayKey(yesterday)) return 'Yesterday'
+  return date.toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' })
 }
 
 function activeCount(categories: ReturnType<typeof useCategories>['items'], id: string): string {

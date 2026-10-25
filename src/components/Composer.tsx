@@ -1,36 +1,60 @@
-import { useState } from 'react'
-import { ArrowUpRight, PenLine } from 'lucide-react'
+import { useEffect, useState } from 'react'
+import { ArrowUpRight, ListChecks, PenLine, Plus, X } from 'lucide-react'
 import { createPost } from '../lib/api'
 import { useAuth } from '../lib/auth'
+import { MentionInput } from '../lib/mentions'
 import type { PickedFile } from '../lib/types'
 import { Avatar } from './Avatar'
 import { MediaPicker, releasePickedFiles } from './MediaPicker'
 import { Spinner } from './Ui'
 import { useToast } from './Toast'
 
-export function Composer({ onPosted }: { onPosted: (postId: string) => void }) {
+export interface ComposerSeed {
+  title?: string
+  body?: string
+  stamp?: number
+}
+
+export function Composer({ onPosted, seed }: { onPosted: (postId: string) => void; seed?: ComposerSeed }) {
   const { profile } = useAuth()
   const toast = useToast()
   const [open, setOpen] = useState(false)
   const [title, setTitle] = useState('')
   const [body, setBody] = useState('')
   const [files, setFiles] = useState<PickedFile[]>([])
+  const [pollOpen, setPollOpen] = useState(false)
+  const [pollOptions, setPollOptions] = useState<string[]>(['', ''])
   const [saving, setSaving] = useState(false)
   const [progress, setProgress] = useState<{ done: number; total: number } | null>(null)
+
+  useEffect(() => {
+    if (!seed) return
+    setOpen(true)
+    if (seed.title !== undefined) setTitle(seed.title)
+    if (seed.body !== undefined) setBody(seed.body)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [seed?.stamp])
 
   function reset() {
     setTitle('')
     setBody('')
+    setPollOpen(false)
+    setPollOptions(['', ''])
     releasePickedFiles(files)
     setFiles([])
     setOpen(false)
   }
 
   async function submit() {
+    const options = pollOptions.map((option) => option.trim()).filter(Boolean)
     // Nothing is required beyond having something to say: a title, some text or
     // an attachment is enough on its own.
-    if (!title.trim() && !body.trim() && files.length === 0) {
+    if (!title.trim() && !body.trim() && files.length === 0 && options.length === 0) {
       toast('Add something first — a title, a few words or a file.', 'error')
+      return
+    }
+    if (pollOpen && options.length < 2) {
+      toast('A poll needs at least two options.', 'error')
       return
     }
     setSaving(true)
@@ -39,13 +63,15 @@ export function Composer({ onPosted }: { onPosted: (postId: string) => void }) {
         title,
         body,
         files: files.map((item) => item.file),
+        pollOptions: pollOpen ? options : [],
         onProgress: (done, total) => setProgress({ done, total }),
       })
       reset()
       toast('Shared with the circle.', 'success')
       onPosted(postId)
     } catch (error) {
-      toast(error instanceof Error ? error.message : 'Could not publish your post.', 'error')    } finally {
+      toast(error instanceof Error ? error.message : 'Could not publish your post.', 'error')
+    } finally {
       setProgress(null)
       setSaving(false)
     }
@@ -80,10 +106,10 @@ export function Composer({ onPosted }: { onPosted: (postId: string) => void }) {
             maxLength={140}
             className="w-full border-0 bg-transparent p-0 text-[16.5px] font-semibold tracking-[-0.02em] outline-none placeholder:font-semibold placeholder:text-[#b3b3ba]"
           />
-          <textarea
+          <MentionInput
             value={body}
-            onChange={(event) => setBody(event.target.value)}
-            placeholder="Say more, add context, or drop a memory…"
+            onChange={setBody}
+            placeholder="Say more, add context, or drop a memory… Use @ to bring someone in."
             rows={3}
             maxLength={8000}
             className="mt-1.5 w-full resize-none border-0 bg-transparent p-0 text-[14px] leading-relaxed text-[#33333a] outline-none placeholder:text-[#a9a9b0]"
@@ -91,8 +117,77 @@ export function Composer({ onPosted }: { onPosted: (postId: string) => void }) {
         </div>
       </div>
 
+      {pollOpen ? (
+        <div className="mx-4 mb-2 rounded-2xl border border-hair bg-[#fbfbfd] p-2.5">
+          <div className="mb-1.5 flex items-center justify-between px-0.5">
+            <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.1em] text-faint">
+              <ListChecks className="size-3.5" />
+              Poll
+            </span>
+            <button
+              type="button"
+              onClick={() => {
+                setPollOpen(false)
+                setPollOptions(['', ''])
+              }}
+              className="rounded-full p-1 text-faint transition hover:bg-white hover:text-ink"
+              aria-label="Remove the poll"
+            >
+              <X className="size-3.5" />
+            </button>
+          </div>
+          <div className="space-y-1.5">
+            {pollOptions.map((option, index) => (
+              <div key={index} className="flex items-center gap-1.5">
+                <input
+                  value={option}
+                  onChange={(event) =>
+                    setPollOptions((current) =>
+                      current.map((item, position) => (position === index ? event.target.value : item)),
+                    )
+                  }
+                  placeholder={`Option ${index + 1}`}
+                  maxLength={80}
+                  className="field !rounded-xl !py-1.5 !text-[13px]"
+                />
+                {pollOptions.length > 2 ? (
+                  <button
+                    type="button"
+                    onClick={() => setPollOptions((current) => current.filter((_, i) => i !== index))}
+                    className="grid size-7 shrink-0 place-items-center rounded-full text-faint transition hover:bg-white hover:text-danger"
+                    aria-label={`Remove option ${index + 1}`}
+                  >
+                    <X className="size-3.5" />
+                  </button>
+                ) : null}
+              </div>
+            ))}
+          </div>
+          {pollOptions.length < 4 ? (
+            <button
+              type="button"
+              onClick={() => setPollOptions((current) => [...current, ''])}
+              className="mt-1.5 inline-flex items-center gap-1 rounded-full px-2 py-1 text-[11.5px] font-medium text-accent transition hover:bg-accent-soft"
+            >
+              <Plus className="size-3" />
+              Add option
+            </button>
+          ) : null}
+        </div>
+      ) : null}
+
       <div className="px-4 pb-1.5">
         <MediaPicker files={files} onChange={setFiles} />
+        {!pollOpen ? (
+          <button
+            type="button"
+            onClick={() => setPollOpen(true)}
+            className="mt-2 inline-flex items-center gap-1.5 rounded-full border border-hair bg-white px-2.5 py-1 text-[11.5px] font-medium text-muted transition hover:border-[#cfd8e6] hover:text-ink"
+          >
+            <ListChecks className="size-3.5" />
+            Add a poll
+          </button>
+        ) : null}
       </div>
 
       <div className="flex items-center justify-between gap-2 border-t border-hair/70 bg-[#fcfcfe] px-4 py-2.5">

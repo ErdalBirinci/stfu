@@ -4,7 +4,14 @@ export type MediaKind = 'image' | 'video' | 'audio'
 export type RsvpStatus = 'going' | 'maybe' | 'declined'
 export type ReactionEmoji = 'heart' | 'shush' | 'laugh' | 'fire'
 export type CategoryAccent = 'blue' | 'violet' | 'green' | 'amber' | 'rose' | 'slate'
-export type NotificationKind = 'comment' | 'reaction' | 'post' | 'event' | 'memory' | 'reminder'
+export type NotificationKind =
+  | 'comment'
+  | 'reaction'
+  | 'post'
+  | 'event'
+  | 'memory'
+  | 'reminder'
+  | 'mention'
 
 export interface Profile {
   id: string
@@ -35,6 +42,19 @@ export interface MediaItem {
   memory_id: string | null
   created_at: string
   url?: string
+  blur_data?: string | null
+}
+
+export interface PollVote {
+  option_id: string
+  user_id: string
+}
+
+export interface PollOption {
+  id: string
+  label: string
+  position: number
+  votes?: PollVote[] | null
 }
 
 export interface PostReaction {
@@ -59,6 +79,7 @@ export interface Post {
   body: string
   category_id: string | null
   pinned_at: string | null
+  hidden_at?: string | null
   created_at: string
   updated_at: string
   author?: Profile | null
@@ -66,6 +87,7 @@ export interface Post {
   media?: MediaItem[]
   reactions?: PostReaction[]
   comments?: { count: number }[]
+  poll?: PollOption[] | null
 }
 
 export interface OnlineMember {
@@ -119,6 +141,7 @@ export interface CircleEvent {
   all_day: boolean
   created_by: string
   created_at: string
+  cover_path?: string | null
   creator?: Profile | null
   attendees?: EventAttendee[]
 }
@@ -136,10 +159,51 @@ export interface Memory {
   title: string
   description: string | null
   taken_on: string | null
+  publish_at?: string | null
+  event_id?: string | null
   created_by: string
   created_at: string
   creator?: Profile | null
   media?: MediaItem[]
+  event?: Pick<CircleEvent, 'id' | 'title' | 'starts_at'> | null
+}
+
+export interface WeeklyPrompt {
+  week_start: string
+  body: string
+}
+
+export interface CircleRecap {
+  year: number
+  posts: number
+  memories: number
+  media: number
+  comments: number
+  events: number
+  top_post: { title: string; reactions: number } | null
+  busiest_month: { month: string; posts: number } | null
+  most_active: { name: string; actions: number } | null
+  years: number[]
+}
+
+export interface ArchiveMedia {
+  storage_path: string
+  file_name: string
+  kind: MediaKind
+  size_bytes: number
+  post_id: string | null
+  comment_id: string | null
+  memory_id: string | null
+  created_at: string
+}
+
+export interface ArchivePayload {
+  exported_at: string
+  posts: Array<Record<string, unknown> & { id: string; title: string | null; body: string | null }>
+  comments: Array<Record<string, unknown> & { id: string }>
+  memories: Array<Record<string, unknown> & { id: string; title: string }>
+  events: Array<Record<string, unknown> & { id: string }>
+  media: ArchiveMedia[]
 }
 
 export interface MemoryComment {

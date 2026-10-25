@@ -1,6 +1,17 @@
+import type { CSSProperties } from 'react'
 import { Music2 } from 'lucide-react'
 import type { MediaItem } from '../lib/types'
 import { cn } from '../lib/cn'
+
+/** The 24px preview sits behind the photo so the frame is never empty. */
+export function blurStyle(item: MediaItem): CSSProperties | undefined {
+  if (!item.blur_data) return undefined
+  return {
+    backgroundImage: `url(${item.blur_data})`,
+    backgroundSize: 'cover',
+    backgroundPosition: 'center',
+  }
+}
 
 export function MediaGrid({
   items,
@@ -42,7 +53,8 @@ export function MediaGrid({
                     src={item.url}
                     alt={item.file_name}
                     loading="lazy"
-                    className="size-full object-cover transition duration-500 group-hover:scale-[1.02]"
+                    className="size-full bg-[#f0f0f4] object-cover transition duration-500 group-hover:scale-[1.02]"
+                    style={blurStyle(item)}
                   />
                 ) : (
                   <span className="skeleton block size-full" />
