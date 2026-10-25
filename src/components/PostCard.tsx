@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { MessageCircle, MoreHorizontal, Trash2 } from 'lucide-react'
+import { MessageCircle, MoreHorizontal, Pin, Trash2 } from 'lucide-react'
 import { commentCount, deletePost } from '../lib/api'
 import { useAuth } from '../lib/auth'
 import { accent } from '../lib/categories'
@@ -63,20 +63,33 @@ export function PostCard({ post, onDeleted }: { post: Post; onDeleted?: (id: str
         ) : null}
       </div>
 
-      {post.category ? (
-        <Link
-          to={`/?category=${encodeURIComponent(post.category.slug)}`}
-          className={cn(
-            'mt-3 inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[10.5px] font-semibold uppercase tracking-[0.06em] transition hover:opacity-80',
-            accent(post.category.accent).chip,
-          )}
-        >
-          <span className={cn('size-1.5 rounded-full', accent(post.category.accent).dot)} />
-          {post.category.name}
-        </Link>
+      {post.pinned_at || post.category ? (
+        <div className="mt-3 flex flex-wrap items-center gap-1.5">
+          {post.pinned_at ? (
+            <span className="inline-flex items-center gap-1 rounded-full bg-[#fff6e6] px-2 py-0.5 text-[10.5px] font-semibold uppercase tracking-[0.06em] text-[#9a6a12]">
+              <Pin className="size-2.5 fill-current" />
+              Pinned
+            </span>
+          ) : null}
+          {post.category ? (
+            <Link
+              to={`/?category=${encodeURIComponent(post.category.slug)}`}
+              className={cn(
+                'inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[10.5px] font-semibold uppercase tracking-[0.06em] transition hover:opacity-80',
+                accent(post.category.accent).chip,
+              )}
+            >
+              <span className={cn('size-1.5 rounded-full', accent(post.category.accent).dot)} />
+              {post.category.name}
+            </Link>
+          ) : null}
+        </div>
       ) : null}
 
-      <Link to={`/post/${post.id}`} className={cn('block', post.category ? 'mt-2' : 'mt-3')}>
+      <Link
+        to={`/post/${post.id}`}
+        className={cn('block', post.pinned_at || post.category ? 'mt-2' : 'mt-3')}
+      >
         {post.title ? (
           <h2 className="text-[17.5px] font-semibold leading-snug tracking-[-0.022em]">{post.title}</h2>
         ) : null}

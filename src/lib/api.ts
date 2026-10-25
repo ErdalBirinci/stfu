@@ -28,13 +28,13 @@ const MEDIA_FIELDS =
   'id, owner_id, kind, storage_path, file_name, mime_type, size_bytes, post_id, comment_id, memory_id, created_at'
 const CATEGORY_FIELDS = 'id, name, slug, accent, position, created_at'
 const POST_CATEGORY = `category:categories!posts_category_id_fkey(${CATEGORY_FIELDS})`
-const POST_FIELDS = `id, author_id, title, body, category_id, created_at, updated_at,
+const POST_FIELDS = `id, author_id, title, body, category_id, pinned_at, created_at, updated_at,
   author:profiles!posts_author_id_fkey(${PROFILE_FIELDS}),
   ${POST_CATEGORY},
   media(${MEDIA_FIELDS}),
   reactions:post_reactions(emoji, user_id),
   comments(count)`
-const POST_FIELDS_IN_CATEGORY = `id, author_id, title, body, category_id, created_at, updated_at,
+const POST_FIELDS_IN_CATEGORY = `id, author_id, title, body, category_id, pinned_at, created_at, updated_at,
   author:profiles!posts_author_id_fkey(${PROFILE_FIELDS}),
   category:categories!posts_category_id_fkey!inner(${CATEGORY_FIELDS}),
   media(${MEDIA_FIELDS}),
@@ -78,6 +78,8 @@ export async function fetchFeed(limit = 40, categorySlug?: string): Promise<Post
   let query = supabase
     .from('posts')
     .select(categorySlug ? POST_FIELDS_IN_CATEGORY : POST_FIELDS)
+    // Pinned posts hold the top slot, everything else stays newest-first.
+    .order('pinned_at', { ascending: false, nullsFirst: false })
     .order('created_at', { ascending: false })
     .limit(limit)
   if (categorySlug) query = query.eq('category.slug', categorySlug)
@@ -188,14 +190,22 @@ export async function fetchLabelablePosts(limit = 60): Promise<Post[]> {
   const { data, error } = await supabase
     .from('posts')
     .select(
-      `id, author_id, title, body, category_id, created_at, updated_at,
+      `id, author_id, title, body, category_id, pinned_at, created_at, updated_at,
        author:profiles!posts_author_id_fkey(id, display_name),
        ${POST_CATEGORY}`,
     )
+    .order('pinned_at', { ascending: false, nullsFirst: false })
     .order('created_at', { ascending: false })
     .limit(limit)
   if (error) throw error
   return (data ?? []) as unknown as Post[]
+}
+
+export async function setPostPinned(postId: string, pinned: boolean): Promise<void> {
+  const { error } = await supabase.rpc('pin_post', { target: postId, pinned })
+  if (!error) return
+  if (/Only an admin/i.test(error.message)) throw new Error('Only an admin can pin a post.')
+  throw new Error(error.message)
 }
 
 /* -------------------------------- reactions ------------------------------ */

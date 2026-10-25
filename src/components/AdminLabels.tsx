@@ -1,11 +1,12 @@
 import { useMemo, useState } from 'react'
-import { Plus, Tag, Trash2 } from 'lucide-react'
+import { Pin, Plus, Tag, Trash2 } from 'lucide-react'
 import {
   createCategory,
   deleteCategory,
   fetchCategories,
   fetchLabelablePosts,
   setPostCategory,
+  setPostPinned,
   updateCategory,
 } from '../lib/api'
 import { accent, categoryCount, useCategories } from '../lib/categories'
@@ -157,6 +158,19 @@ export function AdminLabels() {
     }
   }
 
+  async function togglePin(post: Post) {
+    setBusyPost(post.id)
+    try {
+      await setPostPinned(post.id, !post.pinned_at)
+      posts.reload()
+      toast(post.pinned_at ? 'Post unpinned.' : 'Pinned to the top.', 'success')
+    } catch (error) {
+      toast(error instanceof Error ? error.message : 'Could not change the pin.', 'error')
+    } finally {
+      setBusyPost(null)
+    }
+  }
+
   async function assign(post: Post, categoryId: string | null) {
     setBusyPost(post.id)
     try {
@@ -246,7 +260,7 @@ export function AdminLabels() {
         <div className="border-b border-hair/70 px-4 py-3.5">
           <h2 className="text-[13px] font-semibold">File the timeline</h2>
           <p className="mt-0.5 text-[11.5px] text-muted">
-            Only admins can label a post; members keep their words untouched.
+            Only admins can label or pin a post. Pinning keeps one post at the top of its label.
           </p>
         </div>
 
@@ -282,6 +296,21 @@ export function AdminLabels() {
                     </p>
                   </div>
                   {busyPost === post.id ? <Spinner className="text-muted" /> : null}
+                  <button
+                    type="button"
+                    onClick={() => void togglePin(post)}
+                    aria-pressed={Boolean(post.pinned_at)}
+                    aria-label={post.pinned_at ? `Unpin ${title}` : `Pin ${title}`}
+                    title={post.pinned_at ? 'Pinned to the top — click to unpin' : 'Pin to the top'}
+                    className={cn(
+                      'grid size-7 shrink-0 place-items-center rounded-full transition',
+                      post.pinned_at
+                        ? 'bg-[#fff6e6] text-[#9a6a12]'
+                        : 'text-faint hover:bg-[#f4f4f8] hover:text-ink',
+                    )}
+                  >
+                    <Pin className={cn('size-3.5', post.pinned_at && 'fill-current')} />
+                  </button>
                   <select
                     value={post.category_id ?? ''}
                     onChange={(event) => void assign(post, event.target.value || null)}

@@ -58,6 +58,7 @@ export interface Post {
   title: string
   body: string
   category_id: string | null
+  pinned_at: string | null
   created_at: string
   updated_at: string
   author?: Profile | null
