@@ -10,11 +10,15 @@ interface AuthValue {
   session: Session | null
   profile: Profile | null
   loading: boolean
+  recovery: boolean
   signIn: (email: string, password: string) => Promise<void>
   signUp: (email: string, password: string, displayName: string) => Promise<{ needsConfirmation: boolean }>
   signOut: () => Promise<void>
   refresh: () => Promise<void>
   applyProfile: (profile: Profile) => void
+  updatePassword: (password: string) => Promise<void>
+  requestPasswordReset: (email: string) => Promise<void>
+  endRecovery: () => void
 }
 
 const AuthContext = createContext<AuthValue | null>(null)
@@ -23,6 +27,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null)
   const [profile, setProfile] = useState<Profile | null>(null)
   const [loading, setLoading] = useState(true)
+  const [recovery, setRecovery] = useState(false)
   const activeUserId = useRef<string | null>(null)
 
   const loadProfile = useCallback(async (userId: string | null) => {
@@ -49,7 +54,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (mounted) setLoading(false)
     })
 
-    const { data: listener } = supabase.auth.onAuthStateChange((_event, nextSession) => {
+    const { data: listener } = supabase.auth.onAuthStateChange((event, nextSession) => {
+      if (event === 'PASSWORD_RECOVERY') setRecovery(true)
       activeUserId.current = nextSession?.user.id ?? null
       setSession(nextSession)
       void loadProfile(nextSession?.user.id ?? null)
@@ -91,9 +97,49 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const applyProfile = useCallback((next: Profile) => setProfile(next), [])
 
+  const updatePassword = useCallback(async (password: string) => {
+    const { error } = await supabase.auth.updateUser({ password })
+    if (error) throw new Error(describeError(error))
+  }, [])
+
+  const requestPasswordReset = useCallback(async (email: string) => {
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: `${window.location.origin}${import.meta.env.BASE_URL}`,
+    })
+    if (error) throw new Error(describeError(error))
+  }, [])
+
+  const endRecovery = useCallback(() => setRecovery(false), [])
+
   const value = useMemo<AuthValue>(
-    () => ({ session, profile, loading, signIn, signUp, signOut, refresh, applyProfile }),
-    [session, profile, loading, signIn, signUp, signOut, refresh, applyProfile],
+    () => ({
+      session,
+      profile,
+      loading,
+      recovery,
+      signIn,
+      signUp,
+      signOut,
+      refresh,
+      applyProfile,
+      updatePassword,
+      requestPasswordReset,
+      endRecovery,
+    }),
+    [
+      session,
+      profile,
+      loading,
+      recovery,
+      signIn,
+      signUp,
+      signOut,
+      refresh,
+      applyProfile,
+      updatePassword,
+      requestPasswordReset,
+      endRecovery,
+    ],
   )
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>

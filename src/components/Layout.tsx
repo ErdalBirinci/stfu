@@ -1,15 +1,18 @@
 import { NavLink, Outlet } from 'react-router-dom'
-import { CalendarDays, Home, Images, LogOut, ShieldCheck, UserRound } from 'lucide-react'
+import { CalendarDays, Home, Images, LogOut, Search, ShieldCheck, UserRound } from 'lucide-react'
 import { useAuth } from '../lib/auth'
 import { cn } from '../lib/cn'
 import { Avatar } from './Avatar'
 import { Logo, LogoMark } from './Logo'
 import { AuthHero } from './AuthHero'
+import { NotificationBell } from './NotificationBell'
+import { NotificationsProvider } from '../lib/notifications'
 
 const navigation = [
   { to: '/', label: 'Timeline', icon: Home, end: true },
   { to: '/calendar', label: 'Calendar', icon: CalendarDays, end: false },
   { to: '/memories', label: 'Memories', icon: Images, end: false },
+  { to: '/search', label: 'Search', icon: Search, end: false },
 ]
 
 function navClass({ isActive }: { isActive: boolean }) {
@@ -52,6 +55,7 @@ function Sidebar() {
       ) : null}
 
       <div className="mt-auto space-y-2 pt-6">
+        <NotificationBell withLabel direction="up" align="left" />
         <NavLink to="/profile" className={navClass}>
           <UserRound className="size-4" />
           Me
@@ -83,9 +87,12 @@ function MobileHeader() {
   return (
     <div className="glass-bar sticky top-0 z-30 flex items-center justify-between border-b border-hair/70 px-4 py-2.5 lg:hidden">
       <Logo />
-      <NavLink to="/profile" aria-label="Your profile">
-        <Avatar name={profile?.display_name ?? 'Me'} path={profile?.avatar_url} size={32} />
-      </NavLink>
+      <div className="flex items-center gap-1.5">
+        <NotificationBell align="right" direction="down" />
+        <NavLink to="/profile" aria-label="Your profile">
+          <Avatar name={profile?.display_name ?? 'Me'} path={profile?.avatar_url} size={32} />
+        </NavLink>
+      </div>
     </div>
   )
 }
@@ -117,16 +124,18 @@ function MobileTabs() {
 
 export function AppLayout() {
   return (
-    <div className="min-h-dvh bg-canvas">
-      <Sidebar />
-      <div className="lg:pl-[264px]">
-        <MobileHeader />
-        <main className="mx-auto w-full max-w-[760px] px-4 pb-24 pt-5 sm:px-6 sm:pt-8 lg:pb-14">
-          <Outlet />
-        </main>
+    <NotificationsProvider>
+      <div className="min-h-dvh bg-canvas">
+        <Sidebar />
+        <div className="lg:pl-[264px]">
+          <MobileHeader />
+          <main className="mx-auto w-full max-w-[760px] px-4 pb-24 pt-5 sm:px-6 sm:pt-8 lg:pb-14">
+            <Outlet />
+          </main>
+        </div>
+        <MobileTabs />
       </div>
-      <MobileTabs />
-    </div>
+    </NotificationsProvider>
   )
 }
 

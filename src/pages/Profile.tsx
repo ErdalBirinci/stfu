@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { Camera, LogOut, ShieldCheck } from 'lucide-react'
+import { Camera, KeyRound, LogOut, ShieldCheck } from 'lucide-react'
 import { updateProfile } from '../lib/api'
 import { useAuth } from '../lib/auth'
 import { displayEmail, fullDate } from '../lib/format'
@@ -9,7 +9,7 @@ import { useToast } from '../components/Toast'
 import { PageHeader, Spinner } from '../components/Ui'
 
 export function ProfilePage() {
-  const { profile, session, applyProfile, signOut } = useAuth()
+  const { profile, session, applyProfile, signOut, updatePassword } = useAuth()
   const toast = useToast()
   const fileRef = useRef<HTMLInputElement>(null)
   const [displayName, setDisplayName] = useState(profile?.display_name ?? '')
@@ -18,6 +18,9 @@ export function ProfilePage() {
   const [preview, setPreview] = useState<string | null>(null)
   const [uploading, setUploading] = useState(false)
   const [saving, setSaving] = useState(false)
+  const [newPassword, setNewPassword] = useState('')
+  const [confirmPassword, setConfirmPassword] = useState('')
+  const [changing, setChanging] = useState(false)
 
   useEffect(() => {
     setDisplayName(profile?.display_name ?? '')
@@ -69,6 +72,30 @@ export function ProfilePage() {
       toast(error instanceof Error ? error.message : 'Could not save your profile.', 'error')
     } finally {
       setSaving(false)
+    }
+  }
+
+  async function changePassword(event: React.FormEvent) {
+    event.preventDefault()
+    if (newPassword.length < 8) {
+      toast('Passwords need at least 8 characters.', 'error')
+      return
+    }
+    if (newPassword !== confirmPassword) {
+      toast('The two passwords do not match.', 'error')
+      return
+    }
+
+    setChanging(true)
+    try {
+      await updatePassword(newPassword)
+      setNewPassword('')
+      setConfirmPassword('')
+      toast('Password updated.', 'success')
+    } catch (error) {
+      toast(error instanceof Error ? error.message : 'Could not update your password.', 'error')
+    } finally {
+      setChanging(false)
     }
   }
 
@@ -161,6 +188,53 @@ export function ProfilePage() {
             </button>
           </div>
         </div>
+      </section>
+
+      <section className="card mt-3.5 p-5">
+        <div className="flex items-center gap-2">
+          <KeyRound className="size-4 text-muted" />
+          <h2 className="text-[15px] font-semibold">Password</h2>
+        </div>
+        <p className="mt-1 text-[12.5px] leading-relaxed text-muted">
+          Change it whenever you like — you stay signed in on this device.
+        </p>
+
+        <form onSubmit={(event) => void changePassword(event)} className="mt-3.5 space-y-3">
+          <div>
+            <label className="label" htmlFor="new-password">
+              New password
+            </label>
+            <input
+              id="new-password"
+              type="password"
+              className="field"
+              value={newPassword}
+              onChange={(event) => setNewPassword(event.target.value)}
+              placeholder="At least 8 characters"
+              autoComplete="new-password"
+            />
+          </div>
+          <div>
+            <label className="label" htmlFor="confirm-password">
+              Repeat it
+            </label>
+            <input
+              id="confirm-password"
+              type="password"
+              className="field"
+              value={confirmPassword}
+              onChange={(event) => setConfirmPassword(event.target.value)}
+              placeholder="Same password again"
+              autoComplete="new-password"
+            />
+          </div>
+          <div className="flex justify-end">
+            <button type="submit" className="btn btn-primary" disabled={changing}>
+              {changing ? <Spinner /> : null}
+              {changing ? 'Updating…' : 'Update password'}
+            </button>
+          </div>
+        </form>
       </section>
 
       <section className="card mt-3.5 p-5">

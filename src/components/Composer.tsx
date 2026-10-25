@@ -16,6 +16,7 @@ export function Composer({ onPosted }: { onPosted: (postId: string) => void }) {
   const [body, setBody] = useState('')
   const [files, setFiles] = useState<PickedFile[]>([])
   const [saving, setSaving] = useState(false)
+  const [progress, setProgress] = useState<{ done: number; total: number } | null>(null)
 
   function reset() {
     setTitle('')
@@ -34,13 +35,18 @@ export function Composer({ onPosted }: { onPosted: (postId: string) => void }) {
     }
     setSaving(true)
     try {
-      const postId = await createPost({ title, body, files: files.map((item) => item.file) })
+      const postId = await createPost({
+        title,
+        body,
+        files: files.map((item) => item.file),
+        onProgress: (done, total) => setProgress({ done, total }),
+      })
       reset()
       toast('Shared with the circle.', 'success')
       onPosted(postId)
     } catch (error) {
-      toast(error instanceof Error ? error.message : 'Could not publish your post.', 'error')
-    } finally {
+      toast(error instanceof Error ? error.message : 'Could not publish your post.', 'error')    } finally {
+      setProgress(null)
       setSaving(false)
     }
   }
@@ -102,7 +108,7 @@ export function Composer({ onPosted }: { onPosted: (postId: string) => void }) {
             disabled={saving}
           >
             {saving ? <Spinner /> : <ArrowUpRight className="size-3.5" />}
-            {saving ? 'Sharing…' : 'Share'}
+            {saving ? (progress ? `Uploading ${progress.done}/${progress.total}…` : 'Sharing…') : 'Share'}
           </button>
         </div>
       </div>

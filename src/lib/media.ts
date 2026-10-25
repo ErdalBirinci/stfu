@@ -3,6 +3,8 @@ import type { MediaItem, MediaKind } from './types'
 
 const SIGNED_TTL_SECONDS = 60 * 60
 const CACHE_TTL_MS = 45 * 60 * 1000
+const MAX_IMAGE_EDGE = 1920
+const COMPRESS_OVER_BYTES = 500 * 1024
 
 const urlCache = new Map<string, { url: string; expires: number }>()
 const inflight = new Map<string, Promise<string | null>>()
@@ -12,6 +14,43 @@ export function kindOf(file: File): MediaKind | null {
   if (file.type.startsWith('video/')) return 'video'
   if (file.type.startsWith('audio/')) return 'audio'
   return null
+}
+
+/**
+ * Photos straight from a phone are often 5–10 MB. Downscaling them in the
+ * browser keeps the free storage bucket usable and uploads much faster.
+ */
+async function compressImage(file: File): Promise<File> {
+  if (!file.type.startsWith('image/') || file.type === 'image/gif') return file
+  if (file.size <= COMPRESS_OVER_BYTES) return file
+
+  try {
+    const bitmap = await createImageBitmap(file)
+    const scale = Math.min(1, MAX_IMAGE_EDGE / Math.max(bitmap.width, bitmap.height))
+    const width = Math.max(1, Math.round(bitmap.width * scale))
+    const height = Math.max(1, Math.round(bitmap.height * scale))
+
+    const canvas = document.createElement('canvas')
+    canvas.width = width
+    canvas.height = height
+    const context = canvas.getContext('2d')
+    if (!context) {
+      bitmap.close?.()
+      return file
+    }
+    context.drawImage(bitmap, 0, 0, width, height)
+    bitmap.close?.()
+
+    const blob = await new Promise<Blob | null>((resolve) =>
+      canvas.toBlob(resolve, 'image/webp', 0.82),
+    )
+    if (!blob || blob.size >= file.size) return file
+
+    const name = `${file.name.replace(/\.[^.]+$/, '')}.webp`
+    return new File([blob], name, { type: 'image/webp', lastModified: Date.now() })
+  } catch {
+    return file
+  }
 }
 
 function extensionOf(file: File): string {
@@ -78,9 +117,10 @@ export async function attachMediaUrls(items: MediaItem[]): Promise<MediaItem[]> 
   return items.map((item) => ({ ...item, url: urlCache.get(item.storage_path)?.url ?? undefined }))
 }
 
-async function uploadOne(ownerId: string, file: File): Promise<Omit<MediaItem, 'id' | 'post_id' | 'comment_id' | 'memory_id' | 'created_at'>> {
+async function uploadOne(ownerId: string, original: File): Promise<Omit<MediaItem, 'id' | 'post_id' | 'comment_id' | 'memory_id' | 'created_at'>> {
+  const file = await compressImage(original)
   const kind = kindOf(file)
-  if (!kind) throw storageError(`"${file.name}" is not a photo, video or audio file.`)
+  if (!kind) throw storageError(`"${original.name}" is not a photo, video or audio file.`)
 
   const path = `${ownerId}/${kind}/${crypto.randomUUID()}.${extensionOf(file)}`
   const { error } = await supabase.storage.from(MEDIA_BUCKET).upload(path, file, {
@@ -104,11 +144,12 @@ export async function uploadMediaFiles(
   ownerId: string,
   files: File[],
   target: { post_id?: string; comment_id?: string; memory_id?: string },
+  onProgress?: (done: number, total: number) => void,
 ): Promise<MediaItem[]> {
   if (files.length === 0) return []
 
   const created: MediaItem[] = []
-  for (const file of files) {
+  for (const [index, file] of files.entries()) {
     const base = await uploadOne(ownerId, file)
     const { data, error } = await supabase
       .from('media')
@@ -122,11 +163,13 @@ export async function uploadMediaFiles(
       .single()
     if (error) throw error
     created.push(data as MediaItem)
+    onProgress?.(index + 1, files.length)
   }
   return attachMediaUrls(created)
 }
 
-export async function uploadAvatar(ownerId: string, file: File): Promise<string> {
+export async function uploadAvatar(ownerId: string, original: File): Promise<string> {
+  const file = await compressImage(original)
   const path = `${ownerId}/avatars/${crypto.randomUUID()}.${extensionOf(file)}`
   const { error } = await supabase.storage.from(MEDIA_BUCKET).upload(path, file, {
     cacheControl: '3600',

@@ -9,6 +9,7 @@ import { Avatar } from '../components/Avatar'
 import { Lightbox } from '../components/Lightbox'
 import { MediaGrid } from '../components/MediaGrid'
 import { MediaPicker, releasePickedFiles } from '../components/MediaPicker'
+import { ReactionBar } from '../components/ReactionBar'
 import { ErrorNote, LoadingRows, Spinner } from '../components/Ui'
 import { useToast } from '../components/Toast'
 import { useAsyncData } from '../lib/hooks'
@@ -257,6 +258,8 @@ export function PostDetailPage() {
               />
             </div>
           ) : null}
+
+          <ReactionBar postId={post.id} reactions={post.reactions} />
         </div>
 
         <div className="flex items-center gap-1.5 border-t border-hair/70 bg-[#fcfcfe] px-5 py-2.5">

@@ -6,10 +6,10 @@ import { Spinner } from '../components/Ui'
 import { useAuth } from '../lib/auth'
 import { normalizeEmail, INTERNAL_EMAIL_DOMAIN } from '../lib/format'
 
-type Mode = 'signin' | 'signup'
+type Mode = 'signin' | 'signup' | 'reset'
 
 export function LoginPage() {
-  const { session, profile, signIn, signUp } = useAuth()
+  const { session, profile, signIn, signUp, requestPasswordReset } = useAuth()
   const [mode, setMode] = useState<Mode>('signin')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -17,6 +17,7 @@ export function LoginPage() {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [confirmationSent, setConfirmationSent] = useState(false)
+  const [resetSent, setResetSent] = useState(false)
 
   // A signed-in member never needs this screen: the gate sends approved members
   // to the timeline and everybody else to the waiting room.
@@ -38,6 +39,7 @@ export function LoginPage() {
     setMode(next)
     setError(null)
     setConfirmationSent(false)
+    setResetSent(false)
   }
 
   async function handleSubmit(event: React.FormEvent) {
@@ -51,6 +53,23 @@ export function LoginPage() {
     const cleanEmail = normalizeEmail(email)
     if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(cleanEmail)) {
       setError('That does not look like an email address or username.')
+      return
+    }
+
+    if (mode === 'reset') {
+      if (cleanEmail.endsWith(`@${INTERNAL_EMAIL_DOMAIN}`)) {
+        setError('That account has no mailbox. Sign in and change your password from your profile.')
+        return
+      }
+      setBusy(true)
+      try {
+        await requestPasswordReset(cleanEmail)
+        setResetSent(true)
+      } catch (resetError) {
+        setError(resetError instanceof Error ? resetError.message : 'Could not send the reset email.')
+      } finally {
+        setBusy(false)
+      }
       return
     }
     if (password.length < 8) {
@@ -90,16 +109,18 @@ export function LoginPage() {
       <div className="card overflow-hidden p-6 sm:p-8">
         <div className="mb-6">
           <h1 className="text-[23px] font-semibold tracking-[-0.03em]">
-            {mode === 'signin' ? 'Welcome back' : 'Ask to join the circle'}
+            {mode === 'signin' ? 'Welcome back' : mode === 'signup' ? 'Ask to join the circle' : 'Reset your password'}
           </h1>
           <p className="mt-1 text-[13px] leading-relaxed text-muted">
             {mode === 'signin'
               ? 'A quiet place for a small group of friends.'
-              : 'Every new member is approved by an admin before the door opens.'}
+              : mode === 'signup'
+                ? 'Every new member is approved by an admin before the door opens.'
+                : 'We will email you a link to choose a new one.'}
           </p>
         </div>
 
-        <div className="segmented mb-5 w-full">
+        <div className={mode === 'reset' ? 'hidden' : 'segmented mb-5 w-full'}>
           <button
             type="button"
             className="flex-1"
@@ -118,7 +139,23 @@ export function LoginPage() {
           </button>
         </div>
 
-        {confirmationSent ? (
+        {resetSent ? (
+          <div className="rounded-2xl border border-[#d6e4fb] bg-accent-soft px-4 py-5 text-center">
+            <MailCheck className="mx-auto mb-2 size-6 text-accent" />
+            <p className="text-[14px] font-semibold">Check your inbox</p>
+            <p className="mx-auto mt-1 max-w-[280px] text-[12.5px] leading-relaxed text-[#4a5b74]">
+              If that address belongs to a member, a link to choose a new password is on its way. It expires
+              after a short while.
+            </p>
+            <button
+              type="button"
+              onClick={() => switchMode('signin')}
+              className="btn btn-quiet mt-4 !text-[12.5px]"
+            >
+              Back to sign in
+            </button>
+          </div>
+        ) : confirmationSent ? (
           <div className="rounded-2xl border border-[#d6e4fb] bg-accent-soft px-4 py-5 text-center">
             <MailCheck className="mx-auto mb-2 size-6 text-accent" />
             <p className="text-[14px] font-semibold">Check your inbox</p>
@@ -158,39 +195,53 @@ export function LoginPage() {
 
         <div>
           <label className="label" htmlFor="email">
-            Email or username
+            {mode === 'reset' ? 'The email you joined with' : 'Email or username'}
           </label>
           <input
             id="email"
-            type="text"
+            type={mode === 'reset' ? 'email' : 'text'}
             className="field"
             value={email}
             onChange={(event) => setEmail(event.target.value)}
-            placeholder="you@example.com or dobby_admin"
-            autoComplete="username"
+            placeholder={mode === 'reset' ? 'you@example.com' : 'you@example.com or dobby_admin'}
+            autoComplete={mode === 'reset' ? 'email' : 'username'}
             autoCapitalize="none"
             spellCheck={false}
           />
           <p className="mt-1 text-[11px] leading-relaxed text-faint">
-            A bare username is treated as an internal address on {INTERNAL_EMAIL_DOMAIN}; no mail is ever
-            sent there.
+            {mode === 'reset'
+              ? 'Reset links only reach real inboxes. Username-only accounts change their password after signing in.'
+              : `A bare username is treated as an internal address on ${INTERNAL_EMAIL_DOMAIN}; no mail is ever sent there.`}
           </p>
         </div>
 
-            <div>
-              <label className="label" htmlFor="password">
-                Password
-              </label>
-              <input
-                id="password"
-                type="password"
-                className="field"
-                value={password}
-                onChange={(event) => setPassword(event.target.value)}
-                placeholder={mode === 'signup' ? 'At least 8 characters' : 'Your password'}
-                autoComplete={mode === 'signup' ? 'new-password' : 'current-password'}
-              />
-            </div>
+            {mode === 'reset' ? null : (
+              <div>
+                <div className="flex items-baseline justify-between">
+                  <label className="label" htmlFor="password">
+                    Password
+                  </label>
+                  {mode === 'signin' ? (
+                    <button
+                      type="button"
+                      onClick={() => switchMode('reset')}
+                      className="mb-1 text-[11.5px] font-medium text-accent transition hover:underline"
+                    >
+                      Forgot password?
+                    </button>
+                  ) : null}
+                </div>
+                <input
+                  id="password"
+                  type="password"
+                  className="field"
+                  value={password}
+                  onChange={(event) => setPassword(event.target.value)}
+                  placeholder={mode === 'signup' ? 'At least 8 characters' : 'Your password'}
+                  autoComplete={mode === 'signup' ? 'new-password' : 'current-password'}
+                />
+              </div>
+            )}
 
             {error ? (
               <p className="rounded-xl bg-[#fff5f4] px-3 py-2 text-[12.5px] text-[#9b2c22]">{error}</p>
@@ -198,9 +249,19 @@ export function LoginPage() {
 
             <button type="submit" className="btn btn-primary w-full !py-2.5" disabled={busy}>
               {busy ? <Spinner /> : null}
-              {mode === 'signin' ? 'Sign in' : 'Send request'}
+              {mode === 'signin' ? 'Sign in' : mode === 'signup' ? 'Send request' : 'Send reset link'}
               {!busy ? <ArrowRight className="size-4" /> : null}
             </button>
+
+            {mode === 'reset' ? (
+              <button
+                type="button"
+                onClick={() => switchMode('signin')}
+                className="w-full text-center text-[12px] font-medium text-muted transition hover:text-ink"
+              >
+                Back to sign in
+              </button>
+            ) : null}
           </form>
         )}
 

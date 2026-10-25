@@ -2,6 +2,8 @@ export type Role = 'admin' | 'member'
 export type MemberStatus = 'pending' | 'approved' | 'rejected' | 'suspended'
 export type MediaKind = 'image' | 'video' | 'audio'
 export type RsvpStatus = 'going' | 'maybe' | 'declined'
+export type ReactionEmoji = 'heart' | 'shush' | 'laugh' | 'fire'
+export type NotificationKind = 'comment' | 'reaction' | 'post' | 'event' | 'memory'
 
 export interface Profile {
   id: string
@@ -33,6 +35,11 @@ export interface MediaItem {
   url?: string
 }
 
+export interface PostReaction {
+  emoji: ReactionEmoji
+  user_id: string
+}
+
 export interface Post {
   id: string
   author_id: string
@@ -42,7 +49,31 @@ export interface Post {
   updated_at: string
   author?: Profile | null
   media?: MediaItem[]
+  reactions?: PostReaction[]
   comments?: { count: number }[]
+}
+
+export interface AppNotification {
+  id: string
+  user_id: string
+  actor_id: string | null
+  kind: NotificationKind
+  entity_id: string | null
+  post_id: string | null
+  body: string | null
+  read_at: string | null
+  created_at: string
+  actor?: Pick<Profile, 'id' | 'display_name' | 'avatar_url'> | null
+}
+
+export interface SearchHit {
+  kind: 'post' | 'comment' | 'memory' | 'event'
+  id: string
+  post_id: string | null
+  title: string
+  snippet: string
+  created_at: string
+  author_name: string
 }
 
 export interface Comment {

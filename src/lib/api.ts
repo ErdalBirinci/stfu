@@ -2,6 +2,7 @@ import { supabase } from './supabase'
 import { attachMediaUrls, removeStorageObjects, uploadMediaFiles } from './media'
 import type {
   AdminStats,
+  AppNotification,
   CircleEvent,
   Comment,
   MediaItem,
@@ -10,8 +11,10 @@ import type {
   Memory,
   Post,
   Profile,
+  ReactionEmoji,
   Role,
   RsvpStatus,
+  SearchHit,
 } from './types'
 
 const PROFILE_FIELDS = 'id, display_name, avatar_url, bio, role, status, created_at, approved_at'
@@ -20,7 +23,10 @@ const MEDIA_FIELDS =
 const POST_FIELDS = `id, author_id, title, body, created_at, updated_at,
   author:profiles!posts_author_id_fkey(${PROFILE_FIELDS}),
   media(${MEDIA_FIELDS}),
+  reactions:post_reactions(emoji, user_id),
   comments(count)`
+const NOTIFICATION_FIELDS = `id, user_id, actor_id, kind, entity_id, post_id, body, read_at, created_at,
+  actor:profiles!notifications_actor_id_fkey(id, display_name, avatar_url)`
 const EVENT_FIELDS = `id, title, description, location, starts_at, ends_at, all_day, created_by, created_at,
   creator:profiles!events_created_by_fkey(${PROFILE_FIELDS}),
   attendees:event_attendees(status, user_id, created_at, profile:profiles!event_attendees_user_id_fkey(${PROFILE_FIELDS}))`
@@ -83,7 +89,12 @@ export async function fetchPost(id: string): Promise<{ post: Post; comments: Com
   return { post, comments }
 }
 
-export async function createPost(input: { title: string; body: string; files: File[] }): Promise<string> {
+export async function createPost(input: {
+  title: string
+  body: string
+  files: File[]
+  onProgress?: (done: number, total: number) => void
+}): Promise<string> {
   const authorId = await currentUserId()
   const { data, error } = await supabase
     .from('posts')
@@ -92,7 +103,7 @@ export async function createPost(input: { title: string; body: string; files: Fi
     .single()
   if (error) throw error
   const postId = (data as { id: string }).id
-  await uploadMediaFiles(authorId, input.files, { post_id: postId })
+  await uploadMediaFiles(authorId, input.files, { post_id: postId }, input.onProgress)
   return postId
 }
 
@@ -104,11 +115,62 @@ export async function deletePost(postId: string): Promise<void> {
   await removeStorageObjects(paths)
 }
 
+/* -------------------------------- reactions ------------------------------ */
+
+export async function setReaction(postId: string, emoji: ReactionEmoji | null): Promise<void> {
+  const userId = await currentUserId()
+  if (!emoji) {
+    const { error } = await supabase
+      .from('post_reactions')
+      .delete()
+      .eq('post_id', postId)
+      .eq('user_id', userId)
+    if (error) throw error
+    return
+  }
+
+  const { error } = await supabase
+    .from('post_reactions')
+    .upsert({ post_id: postId, user_id: userId, emoji }, { onConflict: 'post_id,user_id' })
+  if (error) throw error
+}
+
+/* ------------------------------ notifications ---------------------------- */
+
+export async function fetchNotifications(limit = 30): Promise<AppNotification[]> {
+  const { data, error } = await supabase
+    .from('notifications')
+    .select(NOTIFICATION_FIELDS)
+    .order('created_at', { ascending: false })
+    .limit(limit)
+  if (error) throw error
+  return (data ?? []) as unknown as AppNotification[]
+}
+
+export async function markNotificationsRead(): Promise<void> {
+  const { error } = await supabase
+    .from('notifications')
+    .update({ read_at: new Date().toISOString() })
+    .is('read_at', null)
+  if (error) throw error
+}
+
+/* --------------------------------- search -------------------------------- */
+
+export async function searchCircle(term: string): Promise<SearchHit[]> {
+  const clean = term.trim()
+  if (clean.length < 2) return []
+  const { data, error } = await supabase.rpc('search_circle', { term: clean })
+  if (error) throw error
+  return (data ?? []) as SearchHit[]
+}
+
 export async function addComment(input: {
   postId: string
   body: string
   parentId?: string | null
   files: File[]
+  onProgress?: (done: number, total: number) => void
 }): Promise<void> {
   const authorId = await currentUserId()
   const { data, error } = await supabase
@@ -122,10 +184,12 @@ export async function addComment(input: {
     .select('id')
     .single()
   if (error) throw error
-  await uploadMediaFiles(authorId, input.files, {
-    comment_id: (data as { id: string }).id,
-    post_id: input.postId,
-  })
+  await uploadMediaFiles(
+    authorId,
+    input.files,
+    { comment_id: (data as { id: string }).id, post_id: input.postId },
+    input.onProgress,
+  )
 }
 
 /* --------------------------------- events -------------------------------- */
@@ -233,6 +297,7 @@ export async function createMemory(input: {
   description: string
   takenOn: string | null
   files: File[]
+  onProgress?: (done: number, total: number) => void
 }): Promise<string> {
   const createdBy = await currentUserId()
   const { data, error } = await supabase
@@ -247,13 +312,17 @@ export async function createMemory(input: {
     .single()
   if (error) throw error
   const memoryId = (data as { id: string }).id
-  await uploadMediaFiles(createdBy, input.files, { memory_id: memoryId })
+  await uploadMediaFiles(createdBy, input.files, { memory_id: memoryId }, input.onProgress)
   return memoryId
 }
 
-export async function addMemoryMedia(memoryId: string, files: File[]): Promise<void> {
+export async function addMemoryMedia(
+  memoryId: string,
+  files: File[],
+  onProgress?: (done: number, total: number) => void,
+): Promise<void> {
   const userId = await currentUserId()
-  await uploadMediaFiles(userId, files, { memory_id: memoryId })
+  await uploadMediaFiles(userId, files, { memory_id: memoryId }, onProgress)
 }
 
 export async function deleteMemory(memoryId: string): Promise<void> {

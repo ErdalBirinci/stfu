@@ -71,6 +71,7 @@ function NewMemoryForm({ onCreated }: { onCreated: () => void }) {
   const [takenOn, setTakenOn] = useState('')
   const [files, setFiles] = useState<PickedFile[]>([])
   const [saving, setSaving] = useState(false)
+  const [progress, setProgress] = useState<{ done: number; total: number } | null>(null)
 
   async function submit() {
     if (title.trim().length < 3) {
@@ -84,6 +85,7 @@ function NewMemoryForm({ onCreated }: { onCreated: () => void }) {
         description,
         takenOn: takenOn || null,
         files: files.map((item) => item.file),
+        onProgress: (done, total) => setProgress({ done, total }),
       })
       releasePickedFiles(files)
       toast('Memory saved.', 'success')
@@ -91,6 +93,7 @@ function NewMemoryForm({ onCreated }: { onCreated: () => void }) {
     } catch (error) {
       toast(error instanceof Error ? error.message : 'Could not save the memory.', 'error')
     } finally {
+      setProgress(null)
       setSaving(false)
     }
   }
@@ -149,7 +152,7 @@ function NewMemoryForm({ onCreated }: { onCreated: () => void }) {
       <div className="flex justify-end">
         <button type="button" className="btn btn-primary" onClick={() => void submit()} disabled={saving}>
           {saving ? <Spinner /> : <Plus className="size-4" />}
-          {saving ? 'Saving…' : 'Save memory'}
+          {saving ? (progress ? `Uploading ${progress.done}/${progress.total}…` : 'Saving…') : 'Save memory'}
         </button>
       </div>
     </div>

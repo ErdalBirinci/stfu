@@ -9,6 +9,7 @@ import { Avatar } from './Avatar'
 import { Lightbox } from './Lightbox'
 import { MediaGrid } from './MediaGrid'
 import { Modal } from './Modal'
+import { ReactionBar } from './ReactionBar'
 import { useToast } from './Toast'
 
 export function PostCard({ post, onDeleted }: { post: Post; onDeleted?: (id: string) => void }) {
@@ -80,6 +81,8 @@ export function PostCard({ post, onDeleted }: { post: Post; onDeleted?: (id: str
           />
         </div>
       ) : null}
+
+      <ReactionBar postId={post.id} reactions={post.reactions} />
 
       <div className="mt-3.5 flex items-center gap-1 border-t border-hair/70 pt-2.5">
         <button

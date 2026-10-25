@@ -1,4 +1,4 @@
-import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
+import { BrowserRouter, Navigate, Route, Routes, useLocation } from 'react-router-dom'
 import { AppLayout } from './components/Layout'
 import { LogoMark } from './components/Logo'
 import { ToastProvider } from './components/Toast'
@@ -14,6 +14,8 @@ import { NotFoundPage } from './pages/NotFound'
 import { PendingPage } from './pages/Pending'
 import { PostDetailPage } from './pages/PostDetail'
 import { ProfilePage } from './pages/Profile'
+import { ResetPasswordPage } from './pages/Reset'
+import { SearchPage } from './pages/Search'
 import { SetupPage } from './pages/Setup'
 import { TimelinePage } from './pages/Timeline'
 
@@ -36,6 +38,13 @@ function CircleGate() {
   return <AppLayout />
 }
 
+function RecoveryRedirect() {
+  const { recovery } = useAuth()
+  const location = useLocation()
+  if (recovery && location.pathname !== '/reset') return <Navigate to="/reset" replace />
+  return null
+}
+
 function LoginRoute() {
   const { loading } = useAuth()
   if (loading) return <Splash />
@@ -51,8 +60,10 @@ export function App() {
     <BrowserRouter basename={basename}>
       <AuthProvider>
         <ToastProvider>
+          <RecoveryRedirect />
           <Routes>
             <Route path="/login" element={<LoginRoute />} />
+            <Route path="/reset" element={<ResetPasswordPage />} />
             <Route element={<CircleGate />}>
               <Route path="/" element={<TimelinePage />} />
               <Route path="/post/:id" element={<PostDetailPage />} />
@@ -60,6 +71,7 @@ export function App() {
               <Route path="/events/:id" element={<EventDetailPage />} />
               <Route path="/memories" element={<MemoriesPage />} />
               <Route path="/memories/:id" element={<MemoryDetailPage />} />
+              <Route path="/search" element={<SearchPage />} />
               <Route path="/profile" element={<ProfilePage />} />
               <Route path="/dobby" element={<AdminPage />} />
               <Route path="*" element={<NotFoundPage />} />
