@@ -1,4 +1,4 @@
-import { useCallback } from 'react'
+import { useCallback, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { MessagesSquare, Pin, Tag, X } from 'lucide-react'
 import { Composer } from '../components/Composer'
@@ -10,6 +10,8 @@ import { accent, categoryCount, useCategories } from '../lib/categories'
 import { cn } from '../lib/cn'
 import { greeting } from '../lib/format'
 import { useAsyncData } from '../lib/hooks'
+
+const PINNED_LIMIT = 3
 
 export function TimelinePage() {
   const { profile } = useAuth()
@@ -31,11 +33,15 @@ export function TimelinePage() {
     [data, setData],
   )
 
+  const [showAllPinned, setShowAllPinned] = useState(false)
+
   const posts = data ?? []
   // Pinned posts get their own strip above the feed, so the timeline reads like
   // a noticeboard: what the admin pinned first, then the normal run of posts.
   const pinnedPosts = posts.filter((post) => post.pinned_at)
   const feed = posts.filter((post) => !post.pinned_at)
+  const shownPinned = showAllPinned ? pinnedPosts : pinnedPosts.slice(0, PINNED_LIMIT)
+  const hiddenPinned = pinnedPosts.length - shownPinned.length
 
   return (
     <>
@@ -115,9 +121,19 @@ export function TimelinePage() {
                   Pinned{active ? ` in ${active.name}` : ''}
                 </p>
               </div>
-              {pinnedPosts.map((post) => (
+              {shownPinned.map((post) => (
                 <PostCard key={post.id} post={post} featured onDeleted={handleDeleted} />
               ))}
+              {hiddenPinned > 0 || (showAllPinned && pinnedPosts.length > PINNED_LIMIT) ? (
+                <button
+                  type="button"
+                  onClick={() => setShowAllPinned((open) => !open)}
+                  aria-expanded={showAllPinned}
+                  className="inline-flex items-center gap-1.5 rounded-full border border-[#f0e0bd] bg-white/80 px-3 py-1.5 text-[11.5px] font-semibold text-[#9a6a12] transition hover:bg-[#fffaf0]"
+                >
+                  {hiddenPinned > 0 ? `+${hiddenPinned} more` : 'Show less'}
+                </button>
+              ) : null}
             </section>
           ) : null}
 
