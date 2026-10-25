@@ -17,9 +17,17 @@ static React build that can live on **GitHub Pages**. There is no server to run.
 | **Calendar** | A month view of everything the circle has planned. Any approved member can open an event; everyone else answers **Going / Maybe / Can't go** and sees who else is in. |
 | **Memories** | Albums for trips, birthdays and ordinary evenings. Any approved member can add photos, clips or voice notes to an album, and open anything in a fullscreen viewer. |
 | **Closed membership** | Sign-up only creates an account request. Until an admin approves it, the database refuses to return a single row of content — the waiting room is part of the data model, not just a screen. |
-| **Labels** | The admin files posts under coloured labels from **/dobby → Labels**; members filter the timeline by clicking one in the sidebar. Authors can edit their words but only an admin can label a post — and can pin one post per label so it holds the top of the timeline. The pinned strip on the timeline shows the three newest pins and folds the rest behind a "+N more" toggle. |
+| **Labels** | The admin files posts under coloured labels from **/dobby → Labels**, one by one or several at once, and can hide a post from the circle without deleting it; members filter the timeline by clicking one in the sidebar. Authors can edit their words but only an admin can label a post — and can pin one post per label so it holds the top of the timeline. The pinned strip on the timeline shows the three newest pins and folds the rest behind a "+N more" toggle. |
+| **Mentions** | Type `@` in a post or reply to bring someone in; the name gets a soft highlight and the mentioned member gets a notification, delivered by a database trigger. |
+| **Polls** | Any post can carry a two-to-four option poll. One vote per member, tap again to take it back, and the bars fill with the circle's answer. |
+| **On this day** | The timeline shows memories from this exact day in earlier years, so the archive resurfaces on its own. |
+| **Weekly prompt** | A gentle question rotates every ISO week, stored in `circle_prompts`; one tap starts a post that answers it. |
+| **Time capsules** | A memory can be sealed until a future date. Row-level security hides it (and its photos and replies) from everyone but its author until the morning it opens. |
+| **Event albums** | A memory can belong to an event, and the event page lists the albums shot that night with a one-tap "add photos" flow. |
+| **Recap** | The profile counts up the year: posts, memories, files, replies, plans, the most loved post, the busiest month and who was most present. |
 | **Presence** | The sidebar lists who currently has the circle open, straight from Supabase Realtime presence — nothing is written to the database. |
 | **Installable app** | A web app manifest and service worker make the site installable on phones and desktop; installed it opens full screen and works offline for the shell. |
+| **Archive export** | **/dobby → Archive** checks the contents and packs every post, reply, memory, event and file into a zip with a manifest — the circle's data is never locked in. |
 | **Push** | Installed devices can subscribe to notifications; a database trigger hands every new notification to a Supabase Edge Function that encrypts and delivers it (aes128gcm + VAPID). |
 | **Admin** | `/dobby` holds the request queue, the member list, admin/suspend controls and counts for the whole circle. |
 | **Design** | Light, Apple-leaning interface: system font stack, translucent bars, soft cards, quiet gradients. English copy. |
