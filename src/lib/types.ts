@@ -3,12 +3,13 @@ export type MemberStatus = 'pending' | 'approved' | 'rejected' | 'suspended'
 export type MediaKind = 'image' | 'video' | 'audio'
 export type RsvpStatus = 'going' | 'maybe' | 'declined'
 export type ReactionEmoji = 'heart' | 'shush' | 'laugh' | 'fire'
-export type NotificationKind = 'comment' | 'reaction' | 'post' | 'event' | 'memory'
+export type NotificationKind = 'comment' | 'reaction' | 'post' | 'event' | 'memory' | 'reminder'
 
 export interface Profile {
   id: string
   display_name: string
   avatar_url: string | null
+  cover_url: string | null
   bio: string | null
   role: Role
   status: MemberStatus
@@ -133,4 +134,31 @@ export interface AdminStats {
   posts: number
   events: number
   memories: number
+}
+
+export interface AdminStorage {
+  file_count: number
+  total_bytes: number
+  image_bytes: number
+  video_bytes: number
+  audio_bytes: number
+  bucket_bytes: number
+}
+
+export interface AuditEntry {
+  id: number
+  actor_id: string | null
+  target_id: string | null
+  action: 'status' | 'role'
+  detail: string | null
+  created_at: string
+  actor?: Pick<Profile, 'id' | 'display_name'> | null
+  target?: Pick<Profile, 'id' | 'display_name'> | null
+}
+
+export interface ProfileOverview {
+  posts: Post[]
+  postCount: number
+  memories: Memory[]
+  memoryCount: number
 }

@@ -111,6 +111,8 @@ export function notificationText(notification: AppNotification): string {
       return notification.body ? `${name} planned “${notification.body}”` : `${name} planned an event`
     case 'memory':
       return notification.body ? `${name} added “${notification.body}”` : `${name} added a memory`
+    case 'reminder':
+      return notification.body ? `Reminder: “${notification.body}” starts within a day` : 'An event starts soon'
     default:
       return `${name} did something`
   }
@@ -119,6 +121,7 @@ export function notificationText(notification: AppNotification): string {
 export function notificationHref(notification: AppNotification): string {
   switch (notification.kind) {
     case 'event':
+    case 'reminder':
       return notification.entity_id ? `/events/${notification.entity_id}` : '/calendar'
     case 'memory':
       return notification.entity_id ? `/memories/${notification.entity_id}` : '/memories'

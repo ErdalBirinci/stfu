@@ -2,7 +2,9 @@ import { supabase } from './supabase'
 import { attachMediaUrls, removeStorageObjects, uploadMediaFiles } from './media'
 import type {
   AdminStats,
+  AdminStorage,
   AppNotification,
+  AuditEntry,
   CircleEvent,
   Comment,
   MediaItem,
@@ -11,13 +13,14 @@ import type {
   Memory,
   Post,
   Profile,
+  ProfileOverview,
   ReactionEmoji,
   Role,
   RsvpStatus,
   SearchHit,
 } from './types'
 
-const PROFILE_FIELDS = 'id, display_name, avatar_url, bio, role, status, created_at, approved_at'
+const PROFILE_FIELDS = 'id, display_name, avatar_url, cover_url, bio, role, status, created_at, approved_at'
 const MEDIA_FIELDS =
   'id, owner_id, kind, storage_path, file_name, mime_type, size_bytes, post_id, comment_id, memory_id, created_at'
 const POST_FIELDS = `id, author_id, title, body, created_at, updated_at,
@@ -349,6 +352,7 @@ export async function updateProfile(input: {
   displayName: string
   bio: string
   avatarPath: string | null
+  coverPath?: string | null
 }): Promise<Profile> {
   const userId = await currentUserId()
   const { data, error } = await supabase
@@ -357,6 +361,7 @@ export async function updateProfile(input: {
       display_name: input.displayName.trim(),
       bio: input.bio.trim() || null,
       avatar_url: input.avatarPath,
+      ...(input.coverPath !== undefined ? { cover_url: input.coverPath } : {}),
       updated_at: new Date().toISOString(),
     })
     .eq('id', userId)
@@ -364,6 +369,37 @@ export async function updateProfile(input: {
     .single()
   if (error) throw error
   return data as unknown as Profile
+}
+
+export async function fetchProfileOverview(userId: string): Promise<ProfileOverview> {
+  const [postsResult, memoriesResult] = await Promise.all([
+    supabase
+      .from('posts')
+      .select(POST_FIELDS, { count: 'exact' })
+      .eq('author_id', userId)
+      .order('created_at', { ascending: false })
+      .limit(3),
+    supabase
+      .from('memories')
+      .select(MEMORY_FIELDS, { count: 'exact' })
+      .eq('created_by', userId)
+      .order('created_at', { ascending: false })
+      .limit(3),
+  ])
+
+  if (postsResult.error) throw postsResult.error
+  if (memoriesResult.error) throw memoriesResult.error
+
+  const posts = (postsResult.data ?? []) as unknown as Post[]
+  const memories = (memoriesResult.data ?? []) as unknown as Memory[]
+  await hydrateMedia([...posts, ...memories])
+
+  return {
+    posts,
+    postCount: postsResult.count ?? posts.length,
+    memories,
+    memoryCount: memoriesResult.count ?? memories.length,
+  }
 }
 
 /* ---------------------------------- admin -------------------------------- */
@@ -388,6 +424,36 @@ export async function setMemberStatus(userId: string, status: MemberStatus): Pro
 export async function setMemberRole(userId: string, role: Role): Promise<void> {
   const { error } = await supabase.from('profiles').update({ role }).eq('id', userId)
   if (error) throw error
+}
+
+export async function fetchAdminStorage(): Promise<AdminStorage> {
+  const { data, error } = await supabase.rpc('admin_storage_stats')
+  if (error) throw error
+  const row = (Array.isArray(data) ? data[0] : data) as AdminStorage | null
+  return (
+    row ?? {
+      file_count: 0,
+      total_bytes: 0,
+      image_bytes: 0,
+      video_bytes: 0,
+      audio_bytes: 0,
+      bucket_bytes: 0,
+    }
+  )
+}
+
+export async function fetchAuditLog(limit = 25): Promise<AuditEntry[]> {
+  const { data, error } = await supabase
+    .from('admin_audit')
+    .select(
+      `id, actor_id, target_id, action, detail, created_at,
+       actor:profiles!admin_audit_actor_id_fkey(id, display_name),
+       target:profiles!admin_audit_target_id_fkey(id, display_name)`,
+    )
+    .order('created_at', { ascending: false })
+    .limit(limit)
+  if (error) throw error
+  return (data ?? []) as unknown as AuditEntry[]
 }
 
 export async function fetchAdminStats(): Promise<AdminStats> {

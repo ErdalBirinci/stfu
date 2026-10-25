@@ -1,7 +1,10 @@
 import { useMemo, useState } from 'react'
 import {
+  Activity,
   CalendarDays,
   Check,
+  CheckCheck,
+  HardDrive,
   Images,
   Inbox,
   MessagesSquare,
@@ -14,18 +17,27 @@ import {
   Users,
   X,
 } from 'lucide-react'
-import { fetchAdminStats, fetchMembers, setMemberRole, setMemberStatus } from '../lib/api'
+import {
+  fetchAdminStats,
+  fetchAdminStorage,
+  fetchAuditLog,
+  fetchMembers,
+  setMemberRole,
+  setMemberStatus,
+} from '../lib/api'
 import { useAuth } from '../lib/auth'
 import { cn } from '../lib/cn'
-import { relativeTime, shortDate } from '../lib/format'
+import { fileSize, relativeTime, shortDate } from '../lib/format'
 import { useAsyncData } from '../lib/hooks'
-import type { AdminStats, Member } from '../lib/types'
+import type { AdminStats, AdminStorage, AuditEntry, Member } from '../lib/types'
 import { Avatar } from '../components/Avatar'
 import { useToast } from '../components/Toast'
 import { EmptyState, ErrorNote, PageHeader, Spinner } from '../components/Ui'
 import { NotFoundPage } from './NotFound'
 
-type Tab = 'requests' | 'members'
+type Tab = 'requests' | 'members' | 'activity'
+
+const STORAGE_LIMIT = 1024 * 1024 * 1024
 
 function StatCard({
   icon,
@@ -172,6 +184,8 @@ export function AdminPage() {
 
   const members = useAsyncData(() => fetchMembers(), [])
   const stats = useAsyncData<AdminStats>(() => fetchAdminStats(), [])
+  const storage = useAsyncData<AdminStorage>(() => fetchAdminStorage(), [])
+  const audit = useAsyncData<AuditEntry[]>(() => fetchAuditLog(), [])
 
   const pending = useMemo(
     () => (members.data ?? []).filter((member) => member.status === 'pending'),
@@ -196,6 +210,24 @@ export function AdminPage() {
   // The route name is unlisted; a non-admin simply sees a missing page.
   if (profile?.role !== 'admin') return <NotFoundPage />
 
+  async function approveAll() {
+    if (pending.length === 0) return
+    setBusyId('all')
+    try {
+      for (const member of pending) {
+        await setMemberStatus(member.id, 'approved')
+      }
+      toast(`${pending.length} ${pending.length === 1 ? 'member is' : 'members are'} in.`, 'success')
+      members.reload()
+      stats.reload()
+      audit.reload()
+    } catch (error) {
+      toast(error instanceof Error ? error.message : 'Bulk approval failed.', 'error')
+    } finally {
+      setBusyId(null)
+    }
+  }
+
   async function act(member: Member, action: () => Promise<void>, message: string) {
     setBusyId(member.id)
     try {
@@ -203,6 +235,7 @@ export function AdminPage() {
       toast(message, 'success')
       members.reload()
       stats.reload()
+      audit.reload()
     } catch (error) {
       toast(error instanceof Error ? error.message : 'That action failed.', 'error')
     } finally {
@@ -239,6 +272,30 @@ export function AdminPage() {
         <StatCard icon={<Images className="size-3.5" />} label="Memories" value={counts?.memories ?? 0} />
       </div>
 
+      <section className="card mt-3 p-4">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <h2 className="inline-flex items-center gap-2 text-[13px] font-semibold">
+            <HardDrive className="size-4 text-muted" />
+            Storage
+          </h2>
+          <span className="text-[11.5px] text-muted">
+            {fileSize(storage.data?.total_bytes ?? 0)} of 1 GB
+          </span>
+        </div>
+        <div className="mt-2.5 h-2 overflow-hidden rounded-full bg-[#eef0f5]">
+          <div
+            className="h-full rounded-full bg-gradient-to-r from-[#4a93ff] to-[#0a6cf5] transition-[width] duration-500"
+            style={{ width: `${Math.min(100, ((storage.data?.total_bytes ?? 0) / STORAGE_LIMIT) * 100)}%` }}
+          />
+        </div>
+        <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-[11px] text-faint">
+          <span>{storage.data?.file_count ?? 0} files</span>
+          <span>Photos {fileSize(storage.data?.image_bytes ?? 0)}</span>
+          <span>Video {fileSize(storage.data?.video_bytes ?? 0)}</span>
+          <span>Audio {fileSize(storage.data?.audio_bytes ?? 0)}</span>
+        </div>
+      </section>
+
       <div className="mt-5 flex flex-wrap items-center justify-between gap-2.5">
         <div className="segmented">
           <button type="button" data-active={tab === 'requests'} onClick={() => setTab('requests')}>
@@ -247,20 +304,79 @@ export function AdminPage() {
           <button type="button" data-active={tab === 'members'} onClick={() => setTab('members')}>
             Members ({approved.length})
           </button>
+          <button type="button" data-active={tab === 'activity'} onClick={() => setTab('activity')}>
+            Activity
+          </button>
         </div>
 
-        <label className="relative">
-          <Search className="pointer-events-none absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-faint" />
-          <input
-            value={query}
-            onChange={(event) => setQuery(event.target.value)}
-            placeholder="Search people"
-            aria-label="Search members by name or email"
-            className="field !w-[190px] !py-1.5 !pl-8 !text-[12.5px]"
-          />
-        </label>
+        <div className="flex items-center gap-2">
+          {tab === 'requests' && pending.length > 1 ? (
+            <button
+              type="button"
+              onClick={() => void approveAll()}
+              disabled={busyId === 'all'}
+              className="btn btn-primary !px-3 !py-1.5 !text-[12px]"
+            >
+              {busyId === 'all' ? <Spinner /> : <CheckCheck className="size-3.5" />}
+              Approve all
+            </button>
+          ) : null}
+          {tab === 'activity' ? null : (
+            <label className="relative">
+              <Search className="pointer-events-none absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-faint" />
+              <input
+                value={query}
+                onChange={(event) => setQuery(event.target.value)}
+                placeholder="Search people"
+                aria-label="Search members by name or email"
+                className="field !w-[190px] !py-1.5 !pl-8 !text-[12.5px]"
+              />
+            </label>
+          )}
+        </div>
       </div>
 
+      {tab === 'activity' ? (
+        <section className="card mt-3 overflow-hidden">
+          {audit.error ? (
+            <div className="p-4">
+              <ErrorNote message={audit.error} onRetry={audit.reload} />
+            </div>
+          ) : audit.loading && !audit.data ? (
+            <div className="space-y-2 p-4">
+              {[0, 1, 2].map((index) => (
+                <span key={index} className="skeleton block h-9 w-full rounded-xl" />
+              ))}
+            </div>
+          ) : (audit.data ?? []).length === 0 ? (
+            <div className="p-4">
+              <EmptyState
+                icon={<Activity className="size-5" />}
+                title="Nothing logged yet"
+                description="Approvals, suspensions and role changes will be recorded here with who made them."
+              />
+            </div>
+          ) : (
+            <ul className="divide-y divide-hair/70">
+              {(audit.data ?? []).map((entry) => (
+                <li key={entry.id} className="flex flex-wrap items-center gap-2.5 px-4 py-3">
+                  <Avatar name={entry.actor?.display_name ?? 'System'} size={28} />
+                  <div className="min-w-0 flex-1">
+                    <p className="text-[12.5px] leading-snug">
+                      <span className="font-semibold">{entry.actor?.display_name ?? 'System'}</span>{' '}
+                      {entry.action === 'status' ? 'changed access for' : 'changed the role of'}{' '}
+                      <span className="font-semibold">{entry.target?.display_name ?? 'a member'}</span>
+                    </p>
+                    <p className="mt-0.5 text-[10.5px] text-faint">
+                      {entry.detail} · {relativeTime(entry.created_at)}
+                    </p>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
+      ) : (
       <section className="card mt-3 overflow-hidden">
         {members.error ? (
           <div className="p-4">
@@ -321,6 +437,7 @@ export function AdminPage() {
           ))
         )}
       </section>
+      )}
 
       <p className="mt-3 px-1 text-[11px] leading-relaxed text-faint">
         Approvals take effect immediately: an approved member can read and post straight away, a suspended

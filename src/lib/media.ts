@@ -180,6 +180,18 @@ export async function uploadAvatar(ownerId: string, original: File): Promise<str
   return path
 }
 
+export async function uploadCover(ownerId: string, original: File): Promise<string> {
+  const file = await compressImage(original)
+  const path = `${ownerId}/covers/${crypto.randomUUID()}.${extensionOf(file)}`
+  const { error } = await supabase.storage.from(MEDIA_BUCKET).upload(path, file, {
+    cacheControl: '3600',
+    contentType: file.type || undefined,
+    upsert: false,
+  })
+  if (error) throw error
+  return path
+}
+
 export async function removeStorageObjects(paths: string[]): Promise<void> {
   if (paths.length === 0) return
   await supabase.storage.from(MEDIA_BUCKET).remove(paths)

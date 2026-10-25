@@ -9,3 +9,4 @@ dist
 .vscode/*
 !.vscode/extensions.json
 npm-debug.log*
+/freebuff-sites-build/

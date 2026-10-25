@@ -1,9 +1,10 @@
 import { useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
-import { ArrowLeft, CalendarDays, Clock, MapPin, Trash2, Users } from 'lucide-react'
+import { ArrowLeft, CalendarDays, CalendarPlus, Clock, MapPin, Trash2, Users } from 'lucide-react'
 import { clearRsvp, deleteEvent, fetchEvent, setRsvp } from '../lib/api'
 import { useAuth } from '../lib/auth'
 import { eventRange, relativeTime } from '../lib/format'
+import { downloadEventIcs } from '../lib/ics'
 import { useAsyncData } from '../lib/hooks'
 import type { RsvpStatus } from '../lib/types'
 import { Avatar } from '../components/Avatar'
@@ -105,6 +106,15 @@ export function EventDetailPage() {
               </span>
             ) : null}
           </div>
+
+          <button
+            type="button"
+            onClick={() => downloadEventIcs(event)}
+            className="btn btn-quiet mt-3.5 !px-3 !py-1.5 !text-[12px]"
+          >
+            <CalendarPlus className="size-3.5" />
+            Add to calendar
+          </button>
         </div>
 
         <div className="px-5 py-5">
