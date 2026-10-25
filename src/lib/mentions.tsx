@@ -1,5 +1,6 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
+import { createPortal } from 'react-dom'
 import { fetchMemberNames } from './api'
 import { initials } from './format'
 
@@ -69,9 +70,22 @@ export function MentionText({ text }: { text: string }) {
   return <>{nodes}</>
 }
 
+interface Anchor {
+  left: number
+  width: number
+  top?: number
+  bottom?: number
+  maxHeight: number
+}
+
 /**
- * A textarea that offers names the moment someone types "@". The suggestion
- * list lives below the field so it never covers the words being typed.
+ * A textarea that offers names the moment someone types "@".
+ *
+ * The list is rendered into <body> as a fixed layer: the composer and the
+ * memory form sit inside rounded cards with `overflow: hidden`, which used to
+ * clip the suggestions — on a phone the list was invisible, so "@" looked
+ * broken. Measuring the field keeps the list attached to it while the page
+ * scrolls, and it flips above the field when the keyboard leaves no room.
  */
 export function MentionInput({
   value,
@@ -94,6 +108,9 @@ export function MentionInput({
 }) {
   const names = useMemberNames()
   const [query, setQuery] = useState<string | null>(null)
+  const [anchor, setAnchor] = useState<Anchor | null>(null)
+  const areaRef = useRef<HTMLTextAreaElement>(null)
+  const closeTimer = useRef<number | null>(null)
 
   const suggestions = useMemo(() => {
     if (query === null) return []
@@ -101,6 +118,40 @@ export function MentionInput({
     if (!clean) return names.slice(0, 5)
     return names.filter((member) => member.display_name.toLowerCase().includes(clean)).slice(0, 5)
   }, [names, query])
+
+  const open = query !== null && suggestions.length > 0
+
+  useEffect(() => {
+    return () => {
+      if (closeTimer.current !== null) window.clearTimeout(closeTimer.current)
+    }
+  }, [])
+
+  useEffect(() => {
+    if (!open) return
+
+    function place() {
+      const rect = areaRef.current?.getBoundingClientRect()
+      if (!rect) return
+      const roomBelow = window.innerHeight - rect.bottom
+      const above = roomBelow < 240 && rect.top > roomBelow
+      const width = Math.min(rect.width, window.innerWidth - 16)
+      setAnchor({
+        left: Math.max(8, Math.min(rect.left, window.innerWidth - width - 8)),
+        width,
+        ...(above ? { bottom: window.innerHeight - rect.top + 6 } : { top: rect.bottom + 6 }),
+        maxHeight: Math.max(120, Math.min(280, (above ? rect.top : roomBelow) - 16)),
+      })
+    }
+
+    place()
+    window.addEventListener('scroll', place, true)
+    window.addEventListener('resize', place)
+    return () => {
+      window.removeEventListener('scroll', place, true)
+      window.removeEventListener('resize', place)
+    }
+  }, [open])
 
   function handleChange(next: string) {
     onChange(next)
@@ -116,47 +167,72 @@ export function MentionInput({
   function insert(name: string) {
     const at = value.lastIndexOf('@')
     if (at < 0) return
-    const next = `${value.slice(0, at)}@${name} `
-    onChange(next)
+    onChange(`${value.slice(0, at)}@${name} `)
     setQuery(null)
   }
 
-  const open = query !== null && suggestions.length > 0
+  // A tap on a suggestion blurs the field first on touch screens; closing a
+  // moment later lets the tap land before the list disappears.
+  function closeSoon() {
+    if (closeTimer.current !== null) window.clearTimeout(closeTimer.current)
+    closeTimer.current = window.setTimeout(() => setQuery(null), 150)
+  }
+
+  const menu =
+    open && anchor
+      ? createPortal(
+          <div
+            style={{
+              position: 'fixed',
+              zIndex: 80,
+              left: anchor.left,
+              width: anchor.width,
+              top: anchor.top,
+              bottom: anchor.bottom,
+              maxHeight: anchor.maxHeight,
+            }}
+            className="overflow-y-auto overscroll-contain rounded-xl border border-hair bg-white p-1 shadow-lift"
+          >
+            <p className="px-2 pb-1 pt-0.5 text-[10px] font-semibold uppercase tracking-[0.12em] text-faint">
+              Mention
+            </p>
+            {suggestions.map((member) => (
+              <button
+                key={member.id}
+                type="button"
+                onMouseDown={(event) => event.preventDefault()}
+                onClick={() => insert(member.display_name)}
+                className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left transition hover:bg-[#f5f6fa]"
+              >
+                <span className="grid size-5 shrink-0 place-items-center rounded-full bg-accent-soft text-[9px] font-bold text-accent-deep">
+                  {initials(member.display_name)}
+                </span>
+                <span className="truncate text-[12.5px] font-medium">{member.display_name}</span>
+              </button>
+            ))}
+          </div>,
+          document.body,
+        )
+      : null
 
   return (
     <div className="relative">
       <textarea
         id={id}
+        ref={areaRef}
         autoFocus={autoFocus}
         value={value}
         onChange={(event) => handleChange(event.target.value)}
-        onBlur={() => setQuery(null)}
+        onBlur={closeSoon}
+        onFocus={() => {
+          if (closeTimer.current !== null) window.clearTimeout(closeTimer.current)
+        }}
         placeholder={placeholder}
         rows={rows}
         maxLength={maxLength}
         className={className}
       />
-      {open ? (
-        <div className="absolute left-0 right-0 top-full z-30 mt-1 overflow-hidden rounded-xl border border-hair bg-white p-1 shadow-lift">
-          <p className="px-2 pb-1 pt-0.5 text-[10px] font-semibold uppercase tracking-[0.12em] text-faint">
-            Mention
-          </p>
-          {suggestions.map((member) => (
-            <button
-              key={member.id}
-              type="button"
-              onMouseDown={(event) => event.preventDefault()}
-              onClick={() => insert(member.display_name)}
-              className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left transition hover:bg-[#f5f6fa]"
-            >
-              <span className="grid size-5 shrink-0 place-items-center rounded-full bg-accent-soft text-[9px] font-bold text-accent-deep">
-                {initials(member.display_name)}
-              </span>
-              <span className="truncate text-[12.5px] font-medium">{member.display_name}</span>
-            </button>
-          ))}
-        </div>
-      ) : null}
+      {menu}
     </div>
   )
 }

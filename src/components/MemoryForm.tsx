@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Plus, Save } from 'lucide-react'
 import { createMemory, updateMemory } from '../lib/api'
+import { MentionInput } from '../lib/mentions'
 import type { Memory, PickedFile } from '../lib/types'
 import { MediaPicker, releasePickedFiles } from './MediaPicker'
 import { Spinner } from './Ui'
@@ -123,13 +124,13 @@ export function MemoryForm({
         <label className="label" htmlFor="memory-description">
           Story <span className="font-normal text-faint">optional</span>
         </label>
-        <textarea
+        <MentionInput
           id="memory-description"
           className="field resize-none"
           rows={3}
           value={description}
-          onChange={(event) => setDescription(event.target.value)}
-          placeholder="A few lines to remember it by…"
+          onChange={setDescription}
+          placeholder="A few lines to remember it by… Use @ to bring someone in."
           maxLength={4000}
         />
       </div>
