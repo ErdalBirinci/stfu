@@ -9,6 +9,10 @@ type MemberName = { id: string; display_name: string }
 let cached: MemberName[] | null = null
 let pending: Promise<MemberName[]> | null = null
 
+// Only one list may be open at a time: the composer has a title field and a
+// body field, and two lists stacked on top of each other read as a glitch.
+const openMenus = new Map<symbol, () => void>()
+
 function escapeForRegex(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 }
@@ -118,6 +122,7 @@ export function MentionInput({
   const [anchor, setAnchor] = useState<Anchor | null>(null)
   const areaRef = useRef<HTMLTextAreaElement>(null)
   const closeTimer = useRef<number | null>(null)
+  const owner = useRef(Symbol('mention'))
 
   const suggestions = useMemo(() => {
     if (query === null) return []
@@ -133,6 +138,19 @@ export function MentionInput({
       if (closeTimer.current !== null) window.clearTimeout(closeTimer.current)
     }
   }, [])
+
+  useEffect(() => {
+    if (!open) return
+
+    const mine = owner.current
+    for (const [key, close] of openMenus) {
+      if (key !== mine) close()
+    }
+    openMenus.set(mine, () => setQuery(null))
+    return () => {
+      openMenus.delete(mine)
+    }
+  }, [open])
 
   useEffect(() => {
     if (!open) return
