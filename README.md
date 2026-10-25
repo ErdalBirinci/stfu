@@ -164,7 +164,7 @@ once the app has been added to the home screen; iOS does not deliver push to bro
 ## Deploy to GitHub Pages
 
 The live site is https://erdalbirinci.github.io/stfu/ and the admin dashboard is
-https://erdalbirinci.github.io/stfu/dobby.
+https://erdalbirinci.github.io/stfu/#/dobby.
 
 1. Create a **public** repository and push this project to `main`.
 2. In the repository: **Settings → Secrets and variables → Actions → New repository secret**, add
@@ -177,8 +177,12 @@ Notes:
 
 - The build detects the repository name and sets Vite's `base` automatically, so project-page URLs work
   without edits.
-- GitHub Pages has no SPA rewrite. `scripts/postbuild.mjs` copies `index.html` to `404.html`, which is
-  what makes deep links such as `/dobby`, `/post/:id` and `/memories/:id` load correctly.
+- GitHub Pages has no SPA rewrite, so a real path such as `/post/:id` can only be answered with a
+  404 document. Routes therefore live behind the hash (`…/stfu/#/post/:id`, `…/stfu/#/dobby`), which the
+  browser resolves inside the one document Pages does serve — every deep link is a 200.
+- Old real-path links, bookmarks and notification targets still work: the inline script in `index.html`
+  (hence also in `404.html`) forwards them to the matching hash route in a single hop, and the service
+  worker builds hash targets for new pushes.
 - With a custom domain, `/dobby` keeps working the same way; add the domain under
   **Settings → Pages → Custom domain** and to Supabase's redirect URLs.
 - `/dobby` is unlisted, not secret: it is a static file. The real protection is the database policy —
