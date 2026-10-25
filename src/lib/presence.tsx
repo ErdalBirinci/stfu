@@ -1,4 +1,5 @@
-import { useEffect, useState } from 'react'
+import { createContext, useContext, useEffect, useState } from 'react'
+import type { ReactNode } from 'react'
 import { useAuth } from './auth'
 import { supabase } from './supabase'
 import type { OnlineMember } from './types'
@@ -11,11 +12,14 @@ interface PresenceMeta {
   avatar_url?: string | null
 }
 
+const PresenceContext = createContext<OnlineMember[]>([])
+
 /**
- * Live list of approved members with the app open. Supabase Realtime tracks
- * join/leave for us, so nothing is written to the database.
+ * One realtime presence channel for the whole app. Supabase tracks join/leave
+ * for us, so nothing is written to the database — a member is "online" exactly
+ * while they have the circle open.
  */
-export function usePresence(): OnlineMember[] {
+export function PresenceProvider({ children }: { children: ReactNode }) {
   const { profile, session } = useAuth()
   const userId = profile?.id ?? null
   const approved = profile?.status === 'approved'
@@ -114,5 +118,9 @@ export function usePresence(): OnlineMember[] {
     }
   }, [ready, userId, profile?.display_name, profile?.avatar_url])
 
-  return online
+  return <PresenceContext.Provider value={online}>{children}</PresenceContext.Provider>
+}
+
+export function useOnlineMembers(): OnlineMember[] {
+  return useContext(PresenceContext)
 }

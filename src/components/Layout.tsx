@@ -8,7 +8,8 @@ import { AuthHero } from './AuthHero'
 import { NotificationBell } from './NotificationBell'
 import { NotificationsProvider } from '../lib/notifications'
 import { CategoriesProvider } from '../lib/categories'
-import { CategoryNav, OnlineNow } from './SidebarSections'
+import { PresenceProvider } from '../lib/presence'
+import { CategoryNav, MobileOnline, OnlineNow } from './SidebarSections'
 import { InstallEntry } from './InstallPrompt'
 
 const navigation = [
@@ -95,8 +96,9 @@ function Sidebar() {
 function MobileHeader() {
   const { profile } = useAuth()
   return (
-    <div className="glass-bar sticky top-0 z-30 flex items-center justify-between border-b border-hair/70 px-4 py-2.5 lg:hidden">
+    <div className="glass-bar sticky top-0 z-30 flex items-center justify-between gap-2 border-b border-hair/70 px-4 py-2.5 lg:hidden">
       <Logo />
+      <MobileOnline />
       <div className="flex items-center gap-1.5">
         <NotificationBell align="right" direction="down" />
         <NavLink to="/profile" aria-label="Your profile">
@@ -135,18 +137,20 @@ function MobileTabs() {
 export function AppLayout() {
   return (
     <CategoriesProvider>
-      <NotificationsProvider>
-        <div className="min-h-dvh bg-canvas">
-          <Sidebar />
-          <div className="lg:pl-[264px]">
-            <MobileHeader />
-            <main className="mx-auto w-full max-w-[760px] px-4 pb-24 pt-5 sm:px-6 sm:pt-8 lg:pb-14">
-              <Outlet />
-            </main>
+      <PresenceProvider>
+        <NotificationsProvider>
+          <div className="min-h-dvh bg-canvas">
+            <Sidebar />
+            <div className="lg:pl-[264px]">
+              <MobileHeader />
+              <main className="mx-auto w-full max-w-[760px] px-4 pb-24 pt-5 sm:px-6 sm:pt-8 lg:pb-14">
+                <Outlet />
+              </main>
+            </div>
+            <MobileTabs />
           </div>
-          <MobileTabs />
-        </div>
-      </NotificationsProvider>
+        </NotificationsProvider>
+      </PresenceProvider>
     </CategoriesProvider>
   )
 }

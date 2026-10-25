@@ -2,14 +2,14 @@ import { Link, useSearchParams } from 'react-router-dom'
 import { useAuth } from '../lib/auth'
 import { accent, categoryCount, useCategories } from '../lib/categories'
 import { cn } from '../lib/cn'
-import { usePresence } from '../lib/presence'
+import { useOnlineMembers } from '../lib/presence'
 import { Avatar } from './Avatar'
 
 const sectionTitle = 'text-[10.5px] font-semibold uppercase tracking-[0.14em] text-faint'
 
 export function OnlineNow() {
   const { profile } = useAuth()
-  const online = usePresence()
+  const online = useOnlineMembers()
 
   return (
     <section aria-label="Who is online">
@@ -54,6 +54,39 @@ export function OnlineNow() {
         <p className="px-3 pt-1 text-[10.5px] text-faint">and {online.length - 6} more</p>
       ) : null}
     </section>
+  )
+}
+
+/** The same presence data, squeezed into the phone header. */
+export function MobileOnline() {
+  const online = useOnlineMembers()
+  if (online.length === 0) return null
+
+  return (
+    <span
+      className="inline-flex items-center gap-1.5 rounded-full border border-hair/70 bg-white/80 py-1 pl-2 pr-1"
+      title={online.map((member) => member.display_name).join(', ')}
+    >
+      <span className="relative flex size-1.5 shrink-0">
+        <span className="absolute inset-0 animate-ping rounded-full bg-[#34c759] opacity-60" />
+        <span className="relative size-1.5 rounded-full bg-[#34c759]" />
+      </span>
+      <span className="flex -space-x-2">
+        {online.slice(0, 3).map((member) => (
+          <Avatar
+            key={member.id}
+            name={member.display_name}
+            path={member.avatar_url}
+            size={20}
+            className="ring-2 ring-white"
+          />
+        ))}
+      </span>
+      <span className="text-[10.5px] font-semibold tabular-nums text-muted">
+        {online.length}
+        <span className="sr-only"> online</span>
+      </span>
+    </span>
   )
 }
 
