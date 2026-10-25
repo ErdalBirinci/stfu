@@ -474,6 +474,15 @@ async function buildContext(row: NotificationRow): Promise<PushContext> {
           if (firstPhoto) context.preview = await signedMediaUrl(firstPhoto.storage_path)
         }
       }
+
+      // A reply with no photo of its own still belongs to a post that may have
+      // one, and that is the picture worth showing.
+      if (!context.preview && row.kind === 'comment' && row.post_id) {
+        const photos = await restRows<{ storage_path: string }>(
+          `media?select=storage_path&post_id=eq.${row.post_id}&kind=eq.image&order=created_at.asc&limit=1`,
+        )
+        if (photos[0]) context.preview = await signedMediaUrl(photos[0].storage_path)
+      }
     }
 
     if (row.kind === 'reaction' && row.post_id) {
