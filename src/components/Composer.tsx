@@ -1,7 +1,9 @@
 import { useEffect, useState } from 'react'
-import { ArrowUpRight, ListChecks, PenLine, Plus, X } from 'lucide-react'
+import { ArrowUpRight, ListChecks, PenLine, Plus, Tag, X } from 'lucide-react'
 import { createPost } from '../lib/api'
 import { useAuth } from '../lib/auth'
+import { accent, useCategories } from '../lib/categories'
+import { cn } from '../lib/cn'
 import { MentionInput } from '../lib/mentions'
 import type { PickedFile } from '../lib/types'
 import { Avatar } from './Avatar'
@@ -17,10 +19,12 @@ export interface ComposerSeed {
 
 export function Composer({ onPosted, seed }: { onPosted: (postId: string) => void; seed?: ComposerSeed }) {
   const { profile } = useAuth()
+  const { items: categories } = useCategories()
   const toast = useToast()
   const [open, setOpen] = useState(false)
   const [title, setTitle] = useState('')
   const [body, setBody] = useState('')
+  const [categoryId, setCategoryId] = useState<string | null>(null)
   const [files, setFiles] = useState<PickedFile[]>([])
   const [pollOpen, setPollOpen] = useState(false)
   const [pollOptions, setPollOptions] = useState<string[]>(['', ''])
@@ -38,6 +42,7 @@ export function Composer({ onPosted, seed }: { onPosted: (postId: string) => voi
   function reset() {
     setTitle('')
     setBody('')
+    setCategoryId(null)
     setPollOpen(false)
     setPollOptions(['', ''])
     releasePickedFiles(files)
@@ -64,6 +69,7 @@ export function Composer({ onPosted, seed }: { onPosted: (postId: string) => voi
         body,
         files: files.map((item) => item.file),
         pollOptions: pollOpen ? options : [],
+        categoryId,
         onProgress: (done, total) => setProgress({ done, total }),
       })
       reset()
@@ -190,6 +196,54 @@ export function Composer({ onPosted, seed }: { onPosted: (postId: string) => voi
           </button>
         ) : null}
       </div>
+
+      {categories.length > 0 ? (
+        <div className="px-4 pb-2.5">
+          <div className="flex items-center gap-1.5">
+            <Tag className="size-3.5 text-faint" />
+            <span className="text-[10.5px] font-semibold uppercase tracking-[0.12em] text-faint">
+              Label
+            </span>
+            <span className="text-[10.5px] text-faint">optional</span>
+          </div>
+          <div className="no-scrollbar mt-1.5 flex gap-1.5 overflow-x-auto pb-0.5">
+            <button
+              type="button"
+              onClick={() => setCategoryId(null)}
+              aria-pressed={categoryId === null}
+              className={cn(
+                'shrink-0 rounded-full border px-2.5 py-1 text-[11.5px] font-medium transition',
+                categoryId === null
+                  ? 'border-transparent bg-ink text-white'
+                  : 'border-hair bg-white text-muted hover:text-ink',
+              )}
+            >
+              No label
+            </button>
+            {categories.map((category) => {
+              const palette = accent(category.accent)
+              const on = categoryId === category.id
+              return (
+                <button
+                  key={category.id}
+                  type="button"
+                  onClick={() => setCategoryId(on ? null : category.id)}
+                  aria-pressed={on}
+                  className={cn(
+                    'inline-flex shrink-0 items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11.5px] font-medium transition',
+                    on
+                      ? cn('border-transparent ring-1', palette.chip, palette.ring)
+                      : 'border-hair bg-white text-muted hover:text-ink',
+                  )}
+                >
+                  <span className={cn('size-1.5 rounded-full', palette.dot)} />
+                  {category.name}
+                </button>
+              )
+            })}
+          </div>
+        </div>
+      ) : null}
 
       <div className="flex items-center justify-between gap-2 border-t border-hair/70 bg-[#fcfcfe] px-4 py-2.5">
         <span className="text-[11.5px] text-faint">{body.length}/8000</span>

@@ -121,7 +121,8 @@ export function TimelinePage() {
       {activeSlug ? (
         <p className="mb-4 flex items-start gap-2 rounded-2xl border border-hair/70 bg-white/70 px-3.5 py-2.5 text-[11.5px] leading-relaxed text-muted">
           <Tag className="mt-0.5 size-3.5 shrink-0 text-faint" />
-          Labels are filed by Dobby. Fresh posts wait here unfiled until they get one.
+          Labels are picked by whoever writes the post. Dobby can still relabel, pin or hide
+          anything.
         </p>
       ) : (
         <>

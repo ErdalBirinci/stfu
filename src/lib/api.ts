@@ -123,12 +123,20 @@ export async function createPost(input: {
   body: string
   files: File[]
   pollOptions?: string[]
+  categoryId?: string | null
   onProgress?: (done: number, total: number) => void
 }): Promise<string> {
   const authorId = await currentUserId()
   const { data, error } = await supabase
     .from('posts')
-    .insert({ author_id: authorId, title: input.title.trim(), body: input.body.trim() })
+    .insert({
+      author_id: authorId,
+      title: input.title.trim(),
+      body: input.body.trim(),
+      // The author picks the shelf the post belongs on; the payload is written
+      // in the same round trip so the post never shows up unfiled first.
+      category_id: input.categoryId ?? null,
+    })
     .select('id')
     .single()
   if (error) throw error
@@ -187,7 +195,8 @@ export async function fetchCategories(): Promise<Category[]> {
 
 function categoryError(message: string): Error {
   if (/duplicate key/i.test(message)) return new Error('A label with that name already exists.')
-  if (/Only an admin/i.test(message)) return new Error('Only an admin can label posts.')
+  if (/can only label your own|Only an admin can label/i.test(message))
+    return new Error('You can only label your own posts.')
   return new Error(message)
 }
 

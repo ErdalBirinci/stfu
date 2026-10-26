@@ -293,7 +293,8 @@ export function AdminLabels() {
         <div className="border-b border-hair/70 px-4 py-3.5">
           <h2 className="text-[13px] font-semibold">File the timeline</h2>
           <p className="mt-0.5 text-[11.5px] text-muted">
-            Only admins can label or pin a post. Pinning keeps one post at the top of its label.
+            People label their own posts as they write them. Here you can relabel, pin or hide
+            anything. Pinning keeps one post at the top of its label.
           </p>
         </div>
 
